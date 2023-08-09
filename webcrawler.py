@@ -1,11 +1,27 @@
 import requests, os, PyPDF2
 from bs4 import BeautifulSoup
 from io import BytesIO
+import re
 
 urls = open("seed.txt").read().strip().split("\n")
 print(urls)
+filters = open("regex-urlfilter.txt").read().strip().split("\n")
+filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
+negativefilters = list(filter(lambda x: x.startswith('-'), filters))
+negativefilters = "|".join(list(map(lambda x: x.strip('-'),negativefilters)))
+positivefilters = list(filter(lambda x: x.startswith('+'), filters))
+positivefilters = "|".join(list(map(lambda x: x.strip('+'),positivefilters)))
 all_data = {}
 process_urls = []
+
+def checkUrl(url):
+	#negpattern = re.compile(r'{}'.format(negativefilters))
+	negmatch = re.match(r'{}'.format(negativefilters), url)
+	positivematch = re.match(r'{}'.format(positivefilters), url)
+	if positivematch and not negmatch:
+		return True
+	else:
+		return False
 
 def getContents(url):
 	response = requests.get(url)
@@ -13,7 +29,6 @@ def getContents(url):
 	
 
 def parseContents(response, original_url):
-	print(original_url)
 	if original_url.endswith('.pdf'):
 		title = original_url
 		content = ''
@@ -31,10 +46,12 @@ def parseContents(response, original_url):
 		original_url = original_url.rstrip('/')
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		for index, url in enumerate(page_urls):
-			if url['href'] and url['href'].startswith("tel:") == False and url['href'].startswith("mailto:") == False and url['href'].startswith("#") == False:
-				clean_url = url['href'].rsplit("/#", 1)[0]
-				clean_url = clean_url if 'http' in clean_url else os.path.join(original_url, clean_url)
-				clean_url = clean_url.rstrip('/')
+			clean_url = url['href'].rsplit("/#", 1)[0]
+			clean_url = clean_url if 'http' in clean_url else os.path.join(original_url, clean_url)
+			clean_url = clean_url.rstrip('/')
+			print(clean_url)
+			print(checkUrl(clean_url))
+			if checkUrl(clean_url):
 				if clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
 					process_urls.append(clean_url)
 	all_data[original_url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
