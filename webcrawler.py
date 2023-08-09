@@ -29,6 +29,7 @@ def getContents(url):
 	
 
 def parseContents(response, original_url):
+	print(original_url)
 	if original_url.endswith('.pdf'):
 		title = original_url
 		content = ''
@@ -47,13 +48,15 @@ def parseContents(response, original_url):
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		for index, url in enumerate(page_urls):
 			clean_url = url['href'].rsplit("/#", 1)[0]
-			clean_url = clean_url if 'http' in clean_url else os.path.join(original_url, clean_url)
+			if 'node' in clean_url and 'http' not in clean_url:
+				clean_url = os.path.join("https://www.lib.ncsu.edu", clean_url)
+			elif 'http' not in clean_url:
+				clean_url = os.path.join(original_url, clean_url)
 			clean_url = clean_url.rstrip('/')
-			print(clean_url)
-			print(checkUrl(clean_url))
-			if checkUrl(clean_url):
-				if clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
-					process_urls.append(clean_url)
+			# print(clean_url)
+			# print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
+			if checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
+				process_urls.append(clean_url)
 	all_data[original_url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
 	}
