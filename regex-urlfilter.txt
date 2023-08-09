@@ -1,0 +1,136 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# The default url filter.
+# Better for whole-internet crawling.
+
+# Each non-comment, non-blank line contains a regular expression
+# prefixed by '+' or '-'.  The first matching pattern in the file
+# determines whether a URL is included or ignored.  If no pattern
+# matches, the URL is ignored.
+
+# skip file: ftp: and mailto: urls
+-^(file|ftp|mailto):
+
+# skip image and other suffixes we can't yet parse
+# for a more extensive coverage use the urlfilter-suffix plugin
+-\.(gif|GIF|jpg|JPG|png|PNG|ico|ICO|css|CSS|sit|SIT|eps|EPS|wmf|WMF|zip|ZIP|ppt|PPT|mpg|MPG|xls|XLS|gz|GZ|rpm|RPM|tgz|TGZ|mov|MOV|exe|EXE|jpeg|JPEG|bmp|BMP|js|JS)$
+
+# allow crawling of news archive pages
++^https://www.lib.ncsu.edu/news/archive/(20[0-9]*)\?.*$
+
+# skip URLs containing certain characters as probable queries, etc.
+-[?*!@=]
+
+# skip URLs with slash-delimited segment that repeats 3+ times, to break loops
+-.*(/[^/]+)/[^/]+\1/[^/]+\1/
+
+# skip certain directories on the NCSU Libraries website that should not be searchable
+-(/dml/roomreservations|/gis/search/|/faq/|/calendar/|/spotlightArchives/|/cgi-bin/|/proxy/)
+-(/reserves/|/podcasts/m3u/|/jobs/epa/internal/)
+-(/etd/|/theses/|/ETD-db/|/search/|/journals/|/catalogws/|/facetbrowser/|/display/)
+-(/ld/|/node/)
+
+# skip URLs to alphabetical lists which typically consist of redundant links
+-(/[a-zA-Z]\.html|#[a-zA-Z]$|\?alpha=[a-zA-Z]$)
+
+# skip redundant finding aids browse pages for now
+#-(/findingaids/allbytitle\.html)
+#-(/findingaids/(all|mc|rb|ua)bynumber\.html)
+#-(/findingaids/(all|mc|rb|ua)bydate\.html)
+#-(/findingaids/(all|mc|rb|ua)bytype\.html)
+# new style finding aids links
+-(/findingaids/search.*)
+-(/findingaids/.*doc\.view)
+-(/findingaids/.*\.xml)
+-(ohioamish)
+
+# skip hours queries
+-(/hours/\?.*)
+
+# skip tempjobs database browse pages
+-(/jobs/tempjobs2/)
+
+# skip urls containing wordpress
+-(wordpress|wp-content|xmlrpc|wp-includes)
+
+# skip agnic sitemap
+-(/agnic/sys_entomology/sitemap\.html)
+
+# skip any /templates directories that may have been migrated to the public website
+-(/templates/)
+-(/website/)
+
+# don't index Scholarly Pubs search and browse pages, except for A-Z author list pages
+-(/repository/search\.php\?.+)
+-(/repository/scholpubs/search\.php\?(?!searchtype=browse|page=browse&ln=[a-zA-Z]$))
+-(/repository/scholpubs/upload/upload\.php\?.+)
+-(/repository/scholpubs/customsearch\.php\?.+)
+
+# skip learning commons forums and redirects
+-(/learningcommons/redirect/)
+
+# skip special collections forestry tei docs
+-(/specialcollections/forestry/.+/)
+
+# skip robots.txt files
+-(/robots.txt/)
+
+# skip XML files that are still being crawled for some reason
+-(/.xml/)
+
+# accept josh wilson's PAMS wiki pages
++^https://wikis.lib.ncsu.edu/index.php/.*PAMS_.*$
+
+# accept wordpress
++^https://news.lib.ncsu.edu
+#+^https://news2.lib.ncsu.edu
+
+# skip wordpress categories/tags/page listings
+-^https:\/\/news\.lib\.ncsu\.edu\/.*\/category\/.*
+-^https:\/\/news\.lib\.ncsu\.edu\/.*\/tag\/.*
+-^https:\/\/news\.lib\.ncsu\.edu\/page\/.*
+
+# skip certain index pages
+-^https://www.lib.ncsu.edu/do$
+#-^https://www.lib.ncsu.edu/staff/results$
+-^https://www.lib.ncsu.edu/stories/all$
+
+-^https://www.lib.ncsu.edu/taxonomy/.*
+-^https://www.lib.ncsu.edu/tag/.*
+-^https://www.lib.ncsu.edu/news/tag/.*
+-^https://www.lib.ncsu.edu/news/author/.*
+-^https://www.lib.ncsu.edu/gis/imagemap/.*
+
+
+# skip homepage
+-^https://www.lib.ncsu.edu/$
+
+# skip the mobile site
+-^https://m.lib.ncsu.edu
+-(/m/.+/)
+
+# skip .edu./ urls
+#-(.edu./)
+
+# skip any rss feeds
+-(/rss.xml)
+-(/feed/)
+
+# otherwise only accept hosts in www.lib.ncsu.edu domain
++^https://www.lib.ncsu.edu
+
+
