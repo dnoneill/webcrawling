@@ -9,7 +9,6 @@ TIMEOUT = 5
 
 urls = open("seed.txt").read().strip().split("\n")
 print(urls)
-urls = ['https://www.lib.ncsu.edu']
 filters = open("regex-urlfilter.txt").read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -92,20 +91,13 @@ for url in urls:
 
 while len(process_urls) > 0:
 	with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
-		print([url for url in process_urls[0:CONNECTIONS]])
-		print('100 urls')
+		# print([url for url in process_urls[0:CONNECTIONS]])
+		# print('100 urls')
 		future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
 		time1 = time.time()
 		for future in concurrent.futures.as_completed(future_to_url):
-			try:
-				data = future.result()
-				print(data)
-				print('future restuls')
-			except Exception as exc:
-				data = str(type(exc))
-				print(exec)
-			finally:
-				print(str(len(all_data.keys())),end="\r")
+			print('all_data {}'.format(len(all_data.keys())))
+			print('process_urls {}'.format(len(process_urls)))
 	time2 = time.time()
 	# process_urls = list(set(process_urls))
 	# print(len(process_urls))
