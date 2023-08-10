@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 
 urls = open("seed.txt").read().strip().split("\n")
 print(urls)
+urls = ['https://www.lib.ncsu.edu/findingaids/search?all_resources=true&filters%5Bagents%5D%5B%5D=Winstead%2C+Nash+Nicks&filters%5Bresource_category%5D=mss']
 filters = open("regex-urlfilter.txt").read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -17,8 +18,8 @@ process_urls = []
 
 def checkUrl(url):
 	#negpattern = re.compile(r'{}'.format(negativefilters))
-	negmatch = re.match(r'{}'.format(negativefilters), url)
-	positivematch = re.match(r'{}'.format(positivefilters), url)
+	negmatch = re.search(r'{}'.format(negativefilters), url)
+	positivematch = re.search(r'{}'.format(positivefilters), url)
 	if positivematch and negmatch == None:
 		return True
 	else:
@@ -26,7 +27,8 @@ def checkUrl(url):
 		return False
 
 def getContents(url):
-	#print(url)
+	print(url)
+	print(checkUrl(url))
 	response = requests.get(url)
 	parseContents(response, url)
 	
@@ -72,8 +74,8 @@ for url in urls:
 	getContents(url)
 
 while len(process_urls) > 0:
-	print(len(process_urls))
 	process_urls = list(set(process_urls))
+	print(len(process_urls))
 	getContents(process_urls[0])
 print(all_data.keys())
 print(len(all_data.keys()))
