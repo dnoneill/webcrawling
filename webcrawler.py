@@ -21,7 +21,6 @@ all_data = {}
 process_urls = []
 processed_urls = []
 retry_urls = []
-import requests
 
 def checkUrl(url):
 	#negpattern = re.compile(r'{}'.format(negativefilters))
@@ -74,7 +73,7 @@ def parseContents(response, original_url):
 			if 'node' in clean_url and 'http' not in clean_url:
 				origin_url = original_url.replace('https://', '').split('/')[0]
 				clean_url = urljoin("https://{}".format(origin_url), clean_url)
-			elif 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == False:
+			elif 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == None:
 				clean_url = urljoin(original_url, clean_url)
 			clean_url = clean_url.rstrip('/').strip()
 			if clean_url in missing_urls:
@@ -118,5 +117,5 @@ while len(process_urls) > 0:
 print(list(all_data.keys()))
 print(len(all_data.keys()))
 
-with open('keys.json') as f:
+with open('keys.json', 'w') as f:
 	json.dump(all_data, f)
