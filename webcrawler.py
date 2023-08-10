@@ -117,3 +117,6 @@ while len(process_urls) > 0:
 	# 	process_urls.remove(process_urls[0])
 print(list(all_data.keys()))
 print(len(all_data.keys()))
+
+with open('keys.json') as f:
+	json.dump(all_data, f)
