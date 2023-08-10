@@ -55,9 +55,9 @@ def parseContents(response, original_url):
 			clean_url = clean_url.rstrip('/')
 			# print(clean_url)
 			# print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
-			if checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
+			if checkUrl(clean_url) and response.url not in process_urls and response.url not in all_data.keys() and any(url in response.url for url in urls) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
 				process_urls.append(clean_url)
-	all_data[original_url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
+	all_data[response.url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
 	}
 	try:
