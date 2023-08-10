@@ -24,12 +24,12 @@ def checkUrl(url):
 		return False
 
 def getContents(url):
+	print(url)
 	response = requests.get(url)
 	parseContents(response, url)
 	
 
 def parseContents(response, original_url):
-	print(original_url)
 	if original_url.endswith('.pdf'):
 		title = original_url
 		content = ''
