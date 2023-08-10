@@ -19,10 +19,13 @@ def checkUrl(url):
 	#negpattern = re.compile(r'{}'.format(negativefilters))
 	negmatch = re.match(r'{}'.format(negativefilters), url)
 	positivematch = re.match(r'{}'.format(positivefilters), url)
-	if positivematch and not negmatch:
+	print(negmatch)
+	print(positivematch)
+	print(url)
+	if positivematch and negmatch == None:
 		return True
 	else:
-		print(url)
+		#print(url)
 		return False
 
 def getContents(url):
@@ -32,7 +35,6 @@ def getContents(url):
 	
 
 def parseContents(response, original_url):
-	print(response.status_code)
 	if original_url.endswith('.pdf') and response.status_code < 400:
 		title = original_url
 		content = ''
@@ -59,7 +61,7 @@ def parseContents(response, original_url):
 			clean_url = clean_url.rstrip('/')
 			# print(clean_url)
 			# print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
-			if checkUrl(clean_url) and response.url not in process_urls and response.url not in all_data.keys() and any(url in response.url for url in urls) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
+			if checkUrl(clean_url) and response.url not in process_urls and response.url not in all_data.keys() and clean_url not in process_urls and clean_url not in all_data.keys():
 				process_urls.append(clean_url)
 	all_data[response.url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
