@@ -2,6 +2,7 @@ import requests, os, PyPDF2
 from bs4 import BeautifulSoup
 from io import BytesIO
 import re
+from urllib.parse import urljoin
 
 urls = open("seed.txt").read().strip().split("\n")
 print(urls)
@@ -21,10 +22,11 @@ def checkUrl(url):
 	if positivematch and not negmatch:
 		return True
 	else:
+		print(url)
 		return False
 
 def getContents(url):
-	print(url)
+	#print(url)
 	response = requests.get(url)
 	parseContents(response, url)
 	
@@ -48,18 +50,22 @@ def parseContents(response, original_url):
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		for index, url in enumerate(page_urls):
 			clean_url = url['href'].rsplit("/#", 1)[0]
-			if 'node' in clean_url and 'http' not in clean_url:
-				clean_url = os.path.join("https://www.lib.ncsu.edu", clean_url)
-			elif 'http' not in clean_url and re.match(r'{}'.format(negativefilters), original_url) == False:
-				clean_url = os.path.join(original_url, clean_url)
+			print(clean_url)
+			print('before')
+			print(re.match(r'{}'.format(negativefilters), clean_url))
+			if clean_url.startswith('/'):
+				clean_url = urljoin(original_url, clean_url)
+			elif 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == False:
+				origin_url = original_url.replace('https://', '').split('/')[0]
+				clean_url = urljoin("https://{}".format(origin_url), clean_url)
 			clean_url = clean_url.rstrip('/')
+			print(clean_url)
+			print('after')
 			# print(clean_url)
 			# print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
+			print(response.url)
 			if checkUrl(clean_url) and response.url not in process_urls and response.url not in all_data.keys() and any(url in response.url for url in urls) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls):
 				process_urls.append(clean_url)
-	if any(url['href'].count('#') > 1 for url in page_urls):
-		print('akfjlsdkjfaljdfsaklfjalsdfjas****{}****'.format(original_url))
-		print(list(map(lambda x: x['href'], page_urls)))
 	all_data[response.url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
 	}
