@@ -15,6 +15,7 @@ positivefilters = list(filter(lambda x: x.startswith('+'), filters))
 positivefilters = "|".join(list(map(lambda x: x.strip('+'),positivefilters)))
 all_data = {}
 process_urls = []
+processed_urls = []
 
 def checkUrl(url):
 	#negpattern = re.compile(r'{}'.format(negativefilters))
@@ -60,11 +61,13 @@ def parseContents(response, original_url):
 			clean_url = clean_url.rstrip('/')
 			# print(clean_url)
 			# print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
-			if checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys():
+			if checkUrl(clean_url) and clean_url not in process_urls and clean_url not in processed_urls:
 				process_urls.append(clean_url)
-	all_data[response.url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
+	all_data[original_url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
 	}
+	processed_urls.append(original_url)
+	processed_urls.append(response.url)
 	try:
 		process_urls.remove(original_url)
 	except Exception as e:
@@ -76,6 +79,10 @@ for url in urls:
 while len(process_urls) > 0:
 	process_urls = list(set(process_urls))
 	print(len(process_urls))
-	getContents(process_urls[0])
+	if process_urls[0] not in processed_urls:
+		getContents(process_urls[0])
+	else:
+		print('else statement')
+		process_urls.remove(process_urls[0])
 print(all_data.keys())
 print(len(all_data.keys()))
