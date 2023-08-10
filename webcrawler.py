@@ -22,6 +22,7 @@ def checkUrl(url):
 	if positivematch and not negmatch:
 		return True
 	else:
+		print(url)
 		return False
 
 def getContents(url):
@@ -31,7 +32,8 @@ def getContents(url):
 	
 
 def parseContents(response, original_url):
-	if original_url.endswith('.pdf'):
+	print(response.status_code)
+	if original_url.endswith('.pdf') and response.status_code < 400:
 		title = original_url
 		content = ''
 		page_urls = None
