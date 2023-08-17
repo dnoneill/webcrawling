@@ -130,6 +130,7 @@ while len(process_urls) > 0:
 	# else:
 	# 	print('else statement')
 	# 	process_urls.remove(process_urls[0])
+
 conn = sqlite3.connect('crawl_db')
 c = conn.cursor()
 c.execute('''
@@ -148,10 +149,8 @@ for key, value in all_data.items():
 		conn.commit()
 	except Exception as e:
 		print(e)
-		print(content)
-
-print(list(all_data.keys()))
+		print(value)
 
 print(len(all_data.keys()))
-
+print(list(all_data.keys()))
 
