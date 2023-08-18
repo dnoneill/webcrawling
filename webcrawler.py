@@ -9,7 +9,6 @@ CONNECTIONS = 100
 TIMEOUT = 5
 missing_urls = ['https://www.lib.ncsu.edu/do/open-research/scholarly-sharing', 'https://www.lib.ncsu.edu/spaces/faculty-workroom-2312a', 'https://www.lib.ncsu.edu/events/femme-making-night-makerspace-2', 'https://www.lib.ncsu.edu/jobs/ehra/experiential-learning-services-librarian-we-are-no-longer-taking-applications-position', 'https://www.lib.ncsu.edu/workshops/signup', 'https://www.lib.ncsu.edu/findingaids/mss00402', 'https://www.lib.ncsu.edu/events/author-event-dr-gladys-kalema-zikusoka-author-walking-gorillas', 'https://www.lib.ncsu.edu/events/stress-busters-drop-space-3', 'https://www.lib.ncsu.edu/findingaids/mc00003', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/events/stress-busters-drop-space-2', 'https://www.lib.ncsu.edu/software/fl-studio-1', 'https://www.lib.ncsu.edu/findingaids/ua016_001', 'https://www.lib.ncsu.edu/news/special-collections/anatomy-finding-aid', 'https://www.lib.ncsu.edu/findingaids/mss00418', 'https://www.lib.ncsu.edu/do/data-management/what-is-a-dmp', 'https://www.lib.ncsu.edu/findingaids/mc00205', 'https://www.lib.ncsu.edu/hunt/in-the-news', 'https://www.lib.ncsu.edu/events/crafting-resilience-drop-space-6', 'https://www.lib.ncsu.edu/findingaids/mss00399', 'https://www.lib.ncsu.edu/shout-outs/single/84671', 'https://www.lib.ncsu.edu/findingaids/mc00240', 'https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/events/documentary-film-screening-only-doctor', 'https://www.lib.ncsu.edu/jobs/ehra/makerspace-librarian-we-are-no-longer-taking-applications-position', 'https://www.lib.ncsu.edu/software/blackmagic-media-express', 'https://www.lib.ncsu.edu/findingaids/mc00518', 'https://www.lib.ncsu.edu/findingaids/ua012_025', 'https://www.lib.ncsu.edu/events/femme-making-night-makerspace', 'https://www.lib.ncsu.edu/events/femme-game-night-2', 'https://www.lib.ncsu.edu/findingaids/mc00535', 'https://www.lib.ncsu.edu/events/stress-buster-come-make-slime', 'https://www.lib.ncsu.edu/hunt/building-hunt', 'https://www.lib.ncsu.edu/events/femme-making-night-makerspace-0', 'https://www.lib.ncsu.edu/news/special-collections/student-spotlight-ellie-beal-special-collections-desk-assistant', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/news/special-collections/archival-terms-explained', 'https://www.lib.ncsu.edu/news/special-collections/archival-terms-explained-part-2', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/events/immersive-highlights-university-history-exhibit-3', 'https://www.lib.ncsu.edu/events/femme-making-night-makerspace-1', 'https://www.lib.ncsu.edu/events/documentary-film-talking-black-america-performance-traditions', 'https://www.lib.ncsu.edu/events/de-stress-fest-inking-some-manga', 'https://www.lib.ncsu.edu/events/global-film-series-rafiki', 'https://www.lib.ncsu.edu/events/making-space-cotton-candy-conversation-jackie-morin', 'https://www.lib.ncsu.edu/findingaids/mc00297', 'https://www.lib.ncsu.edu/events/postponed-global-film-series-grazing-amazon', 'https://www.lib.ncsu.edu/spaces/south-theater', 'https://www.lib.ncsu.edu/jobs/ehra/ask-us-librarian-we-are-no-longer-taking-applications-position', 'https://www.lib.ncsu.edu/findingaids/mc00406/summary', 'https://www.lib.ncsu.edu/findingaids/mc00401', 'https://www.lib.ncsu.edu/software/microstation-connect', 'https://www.lib.ncsu.edu/findingaids/mss00401']
 urls = open("seed.txt").read().strip().split("\n")
-#urls = ['http://127.0.0.1:4000']
 print(urls)
 filters = open("regex-urlfilter.txt").read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
@@ -70,8 +69,6 @@ def parseContents(response, original_url):
 		content = parsed_html.body.get_text() if parsed_html.body else 'find me no text'
 		title = parsed_html.title.get_text() if parsed_html.title else original_url
 		page_urls = parsed_html.find_all(href=True)
-		print(page_urls)
-		print('page_urls')
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		schemamarkup = schemamarkup.get_text("|", strip=True) if schemamarkup else schemamarkup
 		data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
@@ -79,9 +76,7 @@ def parseContents(response, original_url):
 			clean_url = url['href']
 			if 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == None:
 				clean_url = urljoin(data_url, clean_url)
-			print(clean_url)
 			clean_url = clean_url.rstrip('/').strip()
-			print(clean_url)
 			#print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
 			clean_url = clean_url.rsplit("#", 1)[0].strip()
 			if clean_url in missing_urls:
@@ -91,7 +86,6 @@ def parseContents(response, original_url):
 				print(clean_url not in processed_urls)
 				if clean_url in all_data.keys():
 					print('in all data keys')
-			print(checkUrl(clean_url))
 			if checkUrl(clean_url) and clean_url not in process_urls and clean_url not in processed_urls:
 				process_urls.append(clean_url)
 				if clean_url in missing_urls:
@@ -145,11 +139,12 @@ for key, value in all_data.items():
 	      INSERT OR REPLACE INTO crawls (crawl_url, content, jsondata)
 	          VALUES
 	            (?, ?, ?)
-	    ''', (key, value['content'], value['schemamarkup']))
+	    ''', (key, value['content'].astype('str'), value['schemamarkup'].astype('str')))
 		conn.commit()
 	except Exception as e:
+		print(value['content'])
+		print(key)
 		print(e)
-		print(value)
 
 print(len(all_data.keys()))
 print(list(all_data.keys()))
