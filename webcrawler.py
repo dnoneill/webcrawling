@@ -24,7 +24,7 @@ def checkUrl(url):
 	#negpattern = re.compile(r'{}'.format(negativefilters))
 	negmatch = re.search(r'{}'.format(negativefilters), url)
 	positivematch = re.search(r'{}'.format(positivefilters), url)
-	if positivematch and negmatch == None:
+	if positivematch and negmatch == None  and url not in process_urls and url not in processed_urls:
 		return True
 	else:
 		#print(url)
@@ -54,8 +54,10 @@ def getHTTP(text):
 	print([x for x in url])
 	print(len(process_urls))
 	for x in url:
-		process_urls.append(x)
+		if checkUrl(x):
+			process_urls.append(x)
 	print(len(process_urls))
+
 def parseContents(response, original_url):
 	content = ''
 	page_urls = None
@@ -69,7 +71,9 @@ def parseContents(response, original_url):
 					for annot in read_pdf.pages[page]["/Annots"]:
 						obj = annot.get_object()
 						if '/A' in obj.keys() and '/URI' in obj['/A'].keys():
-							process_urls.append(obj['/A']['/URI'])
+							uri = obj['/A']['/URI']
+							if checkUrl(uri):
+								process_urls.append(uri)
 				content += read_pdf.pages[page].extract_text()
 	elif (original_url.lower().endswith('.doc') or original_url.lower().endswith('.docx')) and response.status_code < 400:
 		content = BytesIO(response.content).read()
@@ -101,7 +105,7 @@ def parseContents(response, original_url):
 				print(clean_url not in processed_urls)
 				if clean_url in all_data.keys():
 					print('in all data keys')
-			if checkUrl(clean_url) and clean_url not in process_urls and clean_url not in processed_urls:
+			if checkUrl(clean_url):
 				process_urls.append(clean_url)
 				if clean_url in missing_urls:
 					print('its in there')
