@@ -50,10 +50,12 @@ def getContents(url):
 	return 'FALJDFLDAKJFADSLKJFALKDJFALKSJFLKASDJFALSKDJFALKSDJ'
 	
 def getHTTP(text):
-	regex = r"(https?://\S+)"
+	regex = r"(https?:\S+)(?=\"|'| )"
 	text = text if type(text) == str else str(text)
 	url = re.findall(regex,text)
 	for x in url:
+		if '>' in x:
+			print(x)
 		if checkUrl(x):
 			process_urls.append(x)
 
