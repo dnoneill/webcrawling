@@ -9,6 +9,7 @@ CONNECTIONS = 1000
 TIMEOUT = 5
 missing_urls = ['https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-partners-transformational-scholarships-program-support-students-need', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/events/tom-regan-visiting-fellowship-awardee-talks-dr-joshua-russell']
 urls = open("seed.txt").read().strip().split("\n")
+#urls = ['https://www.lib.ncsu.edu/endeca/publications/catalog-usability-report-feb2008.doc', 'https://www.lib.ncsu.edu/endeca/publications/catalog_usability_report.doc', 'https://www.lib.ncsu.edu/documents/collectionmanagement/projects/collectionsreview/source/README.txt']
 filters = open("regex-urlfilter.txt").read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -24,7 +25,7 @@ def checkUrl(url):
 	#negpattern = re.compile(r'{}'.format(negativefilters))
 	negmatch = re.search(r'{}'.format(negativefilters), url)
 	positivematch = re.search(r'{}'.format(positivefilters), url)
-	if positivematch and negmatch == None  and url not in process_urls and url not in processed_urls:
+	if positivematch and negmatch == None and url not in process_urls and url not in processed_urls:
 		return True
 	else:
 		#print(url)
@@ -33,7 +34,7 @@ def checkUrl(url):
 #print(;fa;dlskfa;lsdkfl;af)
 def getContents(url):
 	# print('get contents')
-	#print(url)
+	print(url)
 	# print(checkUrl(url))
 	#print(url)
 	if url in missing_urls:
@@ -50,13 +51,11 @@ def getContents(url):
 	
 def getHTTP(text):
 	regex = r"(https?://\S+)"
+	text = text if type(text) == str else str(text)
 	url = re.findall(regex,text)
-	print([x for x in url])
-	print(len(process_urls))
 	for x in url:
 		if checkUrl(x):
 			process_urls.append(x)
-	print(len(process_urls))
 
 def parseContents(response, original_url):
 	content = ''
@@ -80,7 +79,7 @@ def parseContents(response, original_url):
 		getHTTP(content)
 		#process_urls =  process_urls + getHTTP(content)
 	elif (original_url.lower().endswith('.txt')):
-		content = response.content.replace("\n", " ").replace("\t", " ").replace("\r", "")
+		content = response.content.decode('utf8').replace("\n", " ").replace("\t", " ").replace("\r", "")
 		getHTTP(content)
 		# process_urls += getHTTP(content)
 	else:
@@ -109,6 +108,7 @@ def parseContents(response, original_url):
 				process_urls.append(clean_url)
 				if clean_url in missing_urls:
 					print('its in there')
+	content = content if type(content) == str else str(content)
 	all_data[original_url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
 	}
@@ -132,9 +132,9 @@ while len(process_urls) > 0:
 		future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
 		time1 = time.time()
 		for future in concurrent.futures.as_completed(future_to_url):
-			#print('all_data {}'.format(len(all_data.keys())))
+			print('all_data {}'.format(len(all_data.keys())))
 			pass
-			#print('process_urls {}'.format(len(process_urls)))
+			print('process_urls {}'.format(len(process_urls)))
 	time2 = time.time()
 	# process_urls = list(set(process_urls))
 	# print(len(process_urls))
@@ -158,7 +158,7 @@ for key, value in all_data.items():
 	      INSERT OR REPLACE INTO crawls (crawl_url, content, jsondata)
 	          VALUES
 	            (?, ?, ?)
-	    ''', (key, value['content'].astype('str'), value['schemamarkup'].astype('str')))
+	    ''', (key, value['content'], json.dumps(value['schemamarkup'])))
 		conn.commit()
 	except Exception as e:
 		print(value['content'])
