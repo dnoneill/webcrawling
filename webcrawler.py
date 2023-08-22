@@ -5,7 +5,7 @@ import re, time, json
 from urllib.parse import urljoin
 import concurrent.futures
 import sqlite3
-CONNECTIONS = 1000
+CONNECTIONS = 2000
 TIMEOUT = 5
 missing_urls = ['https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-partners-transformational-scholarships-program-support-students-need', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/events/tom-regan-visiting-fellowship-awardee-talks-dr-joshua-russell']
 urls = open("seed.txt").read().strip().split("\n")
@@ -34,7 +34,7 @@ def checkUrl(url):
 #print(;fa;dlskfa;lsdkfl;af)
 def getContents(url):
 	# print('get contents')
-	print(url)
+	#print(url)
 	# print(checkUrl(url))
 	#print(url)
 	if url in missing_urls:
@@ -54,8 +54,7 @@ def getHTTP(text):
 	text = text if type(text) == str else str(text)
 	url = re.findall(regex,text)
 	for x in url:
-		if '>' in x:
-			print(x)
+		print('text or doc uri {}'.format(x))
 		if checkUrl(x):
 			process_urls.append(x)
 
@@ -73,6 +72,7 @@ def parseContents(response, original_url):
 						obj = annot.get_object()
 						if '/A' in obj.keys() and '/URI' in obj['/A'].keys():
 							uri = obj['/A']['/URI']
+							print('pdf uri {}'.format(uri))
 							if checkUrl(uri):
 								process_urls.append(uri)
 				content += read_pdf.pages[page].extract_text()
