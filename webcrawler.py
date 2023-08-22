@@ -5,11 +5,10 @@ import re, time, json
 from urllib.parse import urljoin
 import concurrent.futures
 import sqlite3
-CONNECTIONS = 2000
+CONNECTIONS = 1000
 TIMEOUT = 5
-missing_urls = ['https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-partners-transformational-scholarships-program-support-students-need', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008']
+missing_urls = ['https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-partners-transformational-scholarships-program-support-students-need', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/events/tom-regan-visiting-fellowship-awardee-talks-dr-joshua-russell']
 urls = open("seed.txt").read().strip().split("\n")
-print(urls)
 filters = open("regex-urlfilter.txt").read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -34,7 +33,7 @@ def checkUrl(url):
 #print(;fa;dlskfa;lsdkfl;af)
 def getContents(url):
 	# print('get contents')
-	print(url)
+	#print(url)
 	# print(checkUrl(url))
 	#print(url)
 	if url in missing_urls:
@@ -49,7 +48,14 @@ def getContents(url):
 		print('problem url {}$$$$$$$'.format(url))
 	return 'FALJDFLDAKJFADSLKJFALKDJFALKSJFLKASDJFALSKDJFALKSDJ'
 	
-
+def getHTTP(text):
+	regex = r"(https?://\S+)"
+	url = re.findall(regex,text)
+	print([x for x in url])
+	print(len(process_urls))
+	for x in url:
+		process_urls.append(x)
+	print(len(process_urls))
 def parseContents(response, original_url):
 	content = ''
 	page_urls = None
@@ -59,11 +65,20 @@ def parseContents(response, original_url):
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
 			for page in range(len(read_pdf.pages)):
+				if "/Annots" in read_pdf.pages[page]:
+					for annot in read_pdf.pages[page]["/Annots"]:
+						obj = annot.get_object()
+						if '/A' in obj.keys() and '/URI' in obj['/A'].keys():
+							process_urls.append(obj['/A']['/URI'])
 				content += read_pdf.pages[page].extract_text()
 	elif (original_url.lower().endswith('.doc') or original_url.lower().endswith('.docx')) and response.status_code < 400:
 		content = BytesIO(response.content).read()
+		getHTTP(content)
+		#process_urls =  process_urls + getHTTP(content)
 	elif (original_url.lower().endswith('.txt')):
 		content = response.content.replace("\n", " ").replace("\t", " ").replace("\r", "")
+		getHTTP(content)
+		# process_urls += getHTTP(content)
 	else:
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
 		content = parsed_html.body.get_text() if parsed_html.body else 'find me no text'
@@ -113,9 +128,9 @@ while len(process_urls) > 0:
 		future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
 		time1 = time.time()
 		for future in concurrent.futures.as_completed(future_to_url):
-			print('all_data {}'.format(len(all_data.keys())))
+			#print('all_data {}'.format(len(all_data.keys())))
 			pass
-			print('process_urls {}'.format(len(process_urls)))
+			#print('process_urls {}'.format(len(process_urls)))
 	time2 = time.time()
 	# process_urls = list(set(process_urls))
 	# print(len(process_urls))
