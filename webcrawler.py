@@ -5,11 +5,10 @@ import re, time, json
 from urllib.parse import urljoin
 import concurrent.futures
 import sqlite3
-CONNECTIONS = 2000
+CONNECTIONS = 1000
 TIMEOUT = 5
-missing_urls = ['https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-partners-transformational-scholarships-program-support-students-need', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/events/tom-regan-visiting-fellowship-awardee-talks-dr-joshua-russell']
+missing_urls = ['https://www.lib.ncsu.edu/events/paws-break', 'https://www.lib.ncsu.edu/news/main-news/through-their-gift-libraries-pete-and-theresa-dyke-support-nc-state-students-who-are', 'https://www.lib.ncsu.edu/software/leap-sdk', 'https://www.lib.ncsu.edu/events/tom-regan-visiting-fellowship-awardee-talks-dr-joshua-russell', 'https://www.lib.ncsu.edu/events/reading-and-conversation-jai-chakrabarti-jill-mccorkle', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/jobs/shra/university-library-specialist-learning-spaces-services-1', 'https://www.lib.ncsu.edu/software/kinect-sdk', 'https://www.lib.ncsu.edu/events/paws-break-0', 'https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-announces-whitney-barlow-robles-tom-regan-visiting-research-fellow-2023', 'https://www.lib.ncsu.edu/stories/deep-dive-animal-rights-archive', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/software/microsoft-access', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/news/main-news/meet-libraries-and-academic-success-center']
 urls = open("seed.txt").read().strip().split("\n")
-#urls = ['https://www.lib.ncsu.edu/endeca/publications/catalog-usability-report-feb2008.doc', 'https://www.lib.ncsu.edu/endeca/publications/catalog_usability_report.doc', 'https://www.lib.ncsu.edu/documents/collectionmanagement/projects/collectionsreview/source/README.txt']
 filters = open("regex-urlfilter.txt").read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -78,22 +77,41 @@ def parseContents(response, original_url):
 				content += read_pdf.pages[page].extract_text()
 	elif (original_url.lower().endswith('.doc') or original_url.lower().endswith('.docx')) and response.status_code < 400:
 		content = BytesIO(response.content).read()
+		print(original_url)
 		getHTTP(content)
 		#process_urls =  process_urls + getHTTP(content)
-	elif (original_url.lower().endswith('.txt')):
+	elif (original_url.lower().endswith('.txt')) and response.status_code < 400:
 		content = response.content.decode('utf8').replace("\n", " ").replace("\t", " ").replace("\r", "")
+		print(original_url)
 		getHTTP(content)
 		# process_urls += getHTTP(content)
 	else:
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
 		content = parsed_html.body.get_text() if parsed_html.body else 'find me no text'
 		title = parsed_html.title.get_text() if parsed_html.title else original_url
+		metadata = {'description': '', 'keywords':'', 'image': '', 'imagealt': '', 'startDate': '', 'endDate': '', 'duration': '', 'location': '', 'eventStatus': ''}
+		for key in metadata:
+			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
+			get_content = get_content if get_content else parsed_html.find("meta",  {"property":"{}".format(key)})
+			get_content = get_content["content"] if get_content else ''
+			metadata[key] = get_content
 		page_urls = parsed_html.find_all(href=True)
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		schemamarkup = schemamarkup.get_text("|", strip=True) if schemamarkup else schemamarkup
+		if schemamarkup:
+			try:
+				schema = json.loads(schemamarkup)
+				if 'name' in schema.keys():
+					title = schema['name']
+				for key in metadata:
+					if key in schema.keys():
+						metadata[key] = schema[key]
+			except:
+				pass
 		data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
 		for index, url in enumerate(page_urls):
 			clean_url = url['href']
+			print(clean_url)
 			if 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == None:
 				clean_url = urljoin(data_url, clean_url)
 			clean_url = clean_url.rstrip('/').strip()
@@ -111,7 +129,7 @@ def parseContents(response, original_url):
 				if clean_url in missing_urls:
 					print('its in there')
 	content = content if type(content) == str else str(content)
-	all_data[original_url] = {'content': content, 'title': title, 'urls_on_page': page_urls,
+	all_data[original_url] = metadata | {'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code
 	}
 	if response.url != original_url:
@@ -167,6 +185,8 @@ for key, value in all_data.items():
 		print(key)
 		print(e)
 
+existing = {k:v for k,v in all_data.items() if v['status_code'] < 400}
 print(len(all_data.keys()))
 print(list(all_data.keys()))
-
+print(len(existing.keys()))
+print(existing.keys())
