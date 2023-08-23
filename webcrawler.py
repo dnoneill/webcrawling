@@ -62,6 +62,7 @@ def parseContents(response, original_url):
 	page_urls = None
 	title = original_url
 	schemamarkup = {}
+	metadata = {'description': '', 'keywords':'', 'image': '', 'imagealt': '', 'startDate': '', 'endDate': '', 'duration': '', 'location': '', 'eventStatus': ''}
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -89,7 +90,6 @@ def parseContents(response, original_url):
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
 		content = parsed_html.body.get_text() if parsed_html.body else 'find me no text'
 		title = parsed_html.title.get_text() if parsed_html.title else original_url
-		metadata = {'description': '', 'keywords':'', 'image': '', 'imagealt': '', 'startDate': '', 'endDate': '', 'duration': '', 'location': '', 'eventStatus': ''}
 		for key in metadata:
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
 			get_content = get_content if get_content else parsed_html.find("meta",  {"property":"{}".format(key)})
@@ -130,7 +130,7 @@ def parseContents(response, original_url):
 					print('its in there')
 	content = content if type(content) == str else str(content)
 	all_data[original_url] = metadata | {'content': content, 'title': title, 'urls_on_page': page_urls,
-		'schemamarkup': schemamarkup, 'status_code': response.status_code
+		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url
 	}
 	if response.url != original_url:
 		all_data[response.url] = all_data[original_url]
@@ -173,6 +173,7 @@ c.execute('''
 conn.commit()
 
 for key, value in all_data.items():
+
 	try:
 		c.execute('''
 	      INSERT OR REPLACE INTO crawls (crawl_url, content, jsondata)
@@ -185,7 +186,7 @@ for key, value in all_data.items():
 		print(key)
 		print(e)
 
-existing = {k:v for k,v in all_data.items() if v['status_code'] < 400}
+existing = {k:v for k,v in all_data.items() if v['status_code'] < 400 and 'notfound' not in v['redirect_url']}
 print(len(all_data.keys()))
 print(list(all_data.keys()))
 print(len(existing.keys()))
