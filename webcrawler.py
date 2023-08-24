@@ -7,6 +7,7 @@ import concurrent.futures
 import sqlite3
 import pysolr
 from settings import *
+from dateutil import parser
 
 CONNECTIONS = 1000
 TIMEOUT = 5
@@ -47,7 +48,6 @@ def getHTTP(text):
 	text = text if type(text) == str else str(text)
 	url = re.findall(regex,text)
 	for x in url:
-		print('text or doc uri {}'.format(x))
 		if checkUrl(x):
 			process_urls.append(x)
 
@@ -55,12 +55,15 @@ def all_tags(parsed_html, tag):
 	return " ".join(list(map(lambda x: x.get_text(), parsed_html.find_all(tag))))
 
 
+def clean_keys(key):
+	return "".join(re.findall("[a-zA-Z]+", key))
+
 def parseContents(response, original_url):
 	content = ''
 	page_urls = None
 	title = original_url
 	schemamarkup = {}
-	metadata = {element: '' for element in crawlmetadata}
+	metadata = {}
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -98,11 +101,11 @@ def parseContents(response, original_url):
 			print('body tag')
 			content = parsed_html.body.get_text()
 		title = parsed_html.title.get_text() if parsed_html.title else original_url
-		for key in metadata:
+		for key in crawlmetadata:
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
 			get_content = get_content if get_content else parsed_html.find("meta",  {"property":"{}".format(key)})
 			get_content = get_content["content"] if get_content else ''
-			metadata[key] = get_content
+			metadata[clean_keys(key)] = get_content
 		page_urls = parsed_html.find_all(href=True)
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		schemamarkup = schemamarkup.get_text("|", strip=True) if schemamarkup else schemamarkup
@@ -111,9 +114,10 @@ def parseContents(response, original_url):
 				schema = json.loads(schemamarkup)
 				if 'name' in schema.keys():
 					title = schema['name']
-				for key in metadata:
+				for key in crawlmetadata:
 					if key in schema.keys():
-						metadata[key] = schema[key].strip()
+						meta_key = clean_keys(key)
+						metadata[meta_key] = schema[key].strip()
 			except:
 				pass
 		title = title.split(' | ')[0]
@@ -128,11 +132,11 @@ def parseContents(response, original_url):
 				process_urls.append(clean_url)
 	content = content if type(content) == str else str(content)
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
-	all_data[original_url] = metadata | {'id': original_url, 'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
-		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url
+	all_data[original_url] = {**metadata, **{'id': original_url, 'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
+		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url}
 	}
-	if solr_index:
-		solrdict = {k: v for k, v in all_data[original_url].items() if k in solrkeys}
+	if solr_index and response.status_code < 400 and 'page not found' not in title:
+		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if clean_keys(k) in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
 		solr.add([
 		    solrdict
@@ -150,10 +154,14 @@ def parseContents(response, original_url):
 
 def parse_type(sql_keys, key, value):
 	fieldtype = sql_keys[key]
-	if 'TEXT' in fieldtype:
+	if 'text' in fieldtype.lower():
 		return str(value)
-	elif fieldtype == 'INTEGER':
+	elif fieldtype.lower() == 'integer':
 		return int(value)
+	elif fieldtype.lower() == 'date':
+		return parser.parse(value).strftime("%Y-%m-%dT%H:%M:%SZ")
+	else:
+		return str(value)
 
 for url in urls:
 	getContents(url)
@@ -182,7 +190,8 @@ c = conn.cursor()
 
 table = "crawls"
 
-my_keys = {element: 'TEXT' for element in crawlmetadata} | {'id' : 'TEXT PRIMARY KEY', 'content': 'TEXT', 'url': 'TEXT', 'title': 'TEXT','urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT'}
+my_keys = {**{clean_keys(k): v.upper()  for k, v in solrkeys.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT'}}
+print(my_keys)
 table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
 c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
 conn.commit()
@@ -200,10 +209,10 @@ for key, value in all_data.items():
 		print(e)
 
 res = c.execute("SELECT * FROM crawls")
-print(res)
-print(res.fetchall())
+# print(res)
+# print(res.fetchall())
 
-existing = {k:v for k,v in all_data.items() if v['status_code'] < 400 and 'notfound' not in v['redirect_url']}
+existing = {k:v for k,v in all_data.items() if v['status_code'] < 400 and 'notfound' not in v['redirect_url'] and 'not found' not in v['title']}
 print(len(all_data.keys()))
 print(list(all_data.keys()))
 print(len(existing.keys()))
