@@ -1,0 +1,35 @@
+fields:
+  'image:alt':
+    solr: 'imagealt'
+    type: 'text'
+  'description':
+    solr: 'description'
+    type: 'text'
+  'keywords':
+    solr: 'keywords'
+    type: 'text'
+  'image':
+    solr: 'image'
+    type: 'text'
+  'startDate':
+    solr: 'startDate'
+    type: 'date'
+  'endDate':
+    solr: 'endDate'
+    type: 'date'
+  'duration':
+    solr: 'duration'
+    type: 'text'
+  'location':
+    solr: 'location'
+    type: 'text'
+  'eventStatus':
+    type: 'text'
+  'url':
+    type: 'text'
+    solr: 'id'
+
+regex_file: "regex-urlfilter.txt"
+
+solr_index: 'http://solr:8983/solr/nutch'
+seed_file: "seed.txt"

@@ -5,13 +5,14 @@ import re, time, json
 from urllib.parse import urljoin
 import concurrent.futures
 import sqlite3
-import pysolr
-from settings import *
+import pysolr, yaml
 from dateutil import parser
 
 CONNECTIONS = 1000
 TIMEOUT = 5
-urls = open(seed_file).read().strip().split("\n")
+settings = yaml.load(open("settings.yml"), Loader=yaml.FullLoader)
+regex_file = settings['regex_file']
+urls = open(settings['seed_file']).read().strip().split("\n")
 filters = open(regex_file).read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -22,11 +23,13 @@ all_data = {}
 process_urls = []
 processed_urls = []
 retry_urls = []
-
+solr_index = settings['solr_index']
+fields = settings['fields']
+solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys()}
 def checkUrl(url):
 	negmatch = re.search(r'{}'.format(negativefilters), url)
 	positivematch = re.search(r'{}'.format(positivefilters), url)
-	if positivematch and negmatch == None and url not in process_urls and url not in processed_urls:
+	if positivematch and negmatch == None and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
 		return True
 	else:
 		return False
@@ -89,23 +92,24 @@ def parseContents(response, original_url):
 			#print('content tag')
 			content = parsed_html.find("div", {"id": "content"}).get_text()
 		elif parsed_html.main:
-			print('main tag')
+			#print('main tag')
 			content = parsed_html.main.get_text()
 		elif parsed_html.section:
-			print('section tag')
+			#print('section tag')
 			content = all_tags(parsed_html, 'section')
 		elif parsed_html.article:
-			print('article tag')
+			#print('article tag')
 			content = all_tags(parsed_html, 'content')
 		elif parsed_html.body:
-			print('body tag')
+			#print('body tag')
 			content = parsed_html.body.get_text()
 		title = parsed_html.title.get_text() if parsed_html.title else original_url
-		for key in crawlmetadata:
+		for key in fields.keys():
+			meta_key = fields[key]['solr'] if 'solr' in fields[key].keys() else key
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
 			get_content = get_content if get_content else parsed_html.find("meta",  {"property":"{}".format(key)})
 			get_content = get_content["content"] if get_content else ''
-			metadata[clean_keys(key)] = get_content
+			metadata[meta_key] = get_content
 		page_urls = parsed_html.find_all(href=True)
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		schemamarkup = schemamarkup.get_text("|", strip=True) if schemamarkup else schemamarkup
@@ -114,9 +118,9 @@ def parseContents(response, original_url):
 				schema = json.loads(schemamarkup)
 				if 'name' in schema.keys():
 					title = schema['name']
-				for key in crawlmetadata:
+				for key in fields.keys():
 					if key in schema.keys():
-						meta_key = clean_keys(key)
+						meta_key = fields[key]['solr'] if 'solr' in fields[key].keys() else key
 						metadata[meta_key] = schema[key].strip()
 			except:
 				pass
@@ -136,7 +140,7 @@ def parseContents(response, original_url):
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url}
 	}
 	if solr_index and response.status_code < 400 and 'page not found' not in title:
-		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if clean_keys(k) in solrkeys.keys() and v != ''}
+		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
 		solr.add([
 		    solrdict
@@ -158,7 +162,7 @@ def parse_type(sql_keys, key, value):
 		return str(value)
 	elif fieldtype.lower() == 'integer':
 		return int(value)
-	elif fieldtype.lower() == 'date':
+	elif fieldtype.lower() == 'date' and value:
 		return parser.parse(value).strftime("%Y-%m-%dT%H:%M:%SZ")
 	else:
 		return str(value)
@@ -190,8 +194,7 @@ c = conn.cursor()
 
 table = "crawls"
 
-my_keys = {**{clean_keys(k): v.upper()  for k, v in solrkeys.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT'}}
-print(my_keys)
+my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT'}}
 table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
 c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
 conn.commit()
