@@ -7,7 +7,6 @@ import concurrent.futures
 import sqlite3
 import pysolr
 from settings import *
-print(seed_file)
 
 CONNECTIONS = 1000
 TIMEOUT = 5
