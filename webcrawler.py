@@ -5,11 +5,13 @@ import re, time, json
 from urllib.parse import urljoin
 import concurrent.futures
 import sqlite3
+import pysolr
+from settings import *
+
 CONNECTIONS = 1000
 TIMEOUT = 5
-missing_urls = ['https://www.lib.ncsu.edu/events/paws-break', 'https://www.lib.ncsu.edu/news/main-news/through-their-gift-libraries-pete-and-theresa-dyke-support-nc-state-students-who-are', 'https://www.lib.ncsu.edu/software/leap-sdk', 'https://www.lib.ncsu.edu/events/tom-regan-visiting-fellowship-awardee-talks-dr-joshua-russell', 'https://www.lib.ncsu.edu/events/reading-and-conversation-jai-chakrabarti-jill-mccorkle', 'https://www.lib.ncsu.edu/citationbuilder/assets/plus-square-solid.svg', 'https://www.lib.ncsu.edu/jobs/shra/university-library-specialist-learning-spaces-services-1', 'https://www.lib.ncsu.edu/software/kinect-sdk', 'https://www.lib.ncsu.edu/events/paws-break-0', 'https://www.lib.ncsu.edu/citationbuilder/assets/minus-square-solid.svg', 'https://www.lib.ncsu.edu/news/main-news/libraries-announces-whitney-barlow-robles-tom-regan-visiting-research-fellow-2023', 'https://www.lib.ncsu.edu/stories/deep-dive-animal-rights-archive', 'https://www.lib.ncsu.edu/archivedexhibits/pams/index.php', 'https://www.lib.ncsu.edu/software/microsoft-access', 'https://www.lib.ncsu.edu/archivedexhibits/textiles/anniversary/content/Images_Centennial/Img_008', 'https://www.lib.ncsu.edu/news/main-news/meet-libraries-and-academic-success-center']
-urls = open("seed.txt").read().strip().split("\n")
-filters = open("regex-urlfilter.txt").read().strip().split("\n")
+urls = open(seed_file).read().strip().split("\n")
+filters = open(regex_file).read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
 negativefilters = "|".join(list(map(lambda x: x.strip('-'),negativefilters)))
@@ -21,23 +23,15 @@ processed_urls = []
 retry_urls = []
 
 def checkUrl(url):
-	#negpattern = re.compile(r'{}'.format(negativefilters))
 	negmatch = re.search(r'{}'.format(negativefilters), url)
 	positivematch = re.search(r'{}'.format(positivefilters), url)
 	if positivematch and negmatch == None and url not in process_urls and url not in processed_urls:
 		return True
 	else:
-		#print(url)
 		return False
 
-#print(;fa;dlskfa;lsdkfl;af)
 def getContents(url):
-	# print('get contents')
-	#print(url)
-	# print(checkUrl(url))
-	#print(url)
-	if url in missing_urls:
-		print('missing url is getting got: {}'.format(url))
+	print(url)
 	try:
 		response = requests.get(url)
 		parseContents(response, url)
@@ -45,7 +39,7 @@ def getContents(url):
 		print(e)
 		retry_urls.append(url)
 		process_urls.remove(url)
-		print('problem url {}$$$$$$$'.format(url))
+		print('*******problem url {}*******'.format(url))
 	return 'FALJDFLDAKJFADSLKJFALKDJFALKSJFLKASDJFALSKDJFALKSDJ'
 	
 def getHTTP(text):
@@ -57,12 +51,16 @@ def getHTTP(text):
 		if checkUrl(x):
 			process_urls.append(x)
 
+def all_tags(parsed_html, tag):
+	return " ".join(list(map(lambda x: x.get_text(), parsed_html.find_all(tag))))
+
+
 def parseContents(response, original_url):
 	content = ''
 	page_urls = None
 	title = original_url
 	schemamarkup = {}
-	metadata = {'description': '', 'keywords':'', 'image': '', 'imagealt': '', 'startDate': '', 'endDate': '', 'duration': '', 'location': '', 'eventStatus': ''}
+	metadata = {element: '' for element in crawlmetadata}
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -72,23 +70,33 @@ def parseContents(response, original_url):
 						obj = annot.get_object()
 						if '/A' in obj.keys() and '/URI' in obj['/A'].keys():
 							uri = obj['/A']['/URI']
-							print('pdf uri {}'.format(uri))
 							if checkUrl(uri):
 								process_urls.append(uri)
 				content += read_pdf.pages[page].extract_text()
 	elif (original_url.lower().endswith('.doc') or original_url.lower().endswith('.docx')) and response.status_code < 400:
 		content = BytesIO(response.content).read()
-		print(original_url)
 		getHTTP(content)
-		#process_urls =  process_urls + getHTTP(content)
 	elif (original_url.lower().endswith('.txt')) and response.status_code < 400:
 		content = response.content.decode('utf8').replace("\n", " ").replace("\t", " ").replace("\r", "")
-		print(original_url)
 		getHTTP(content)
-		# process_urls += getHTTP(content)
 	else:
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
-		content = parsed_html.body.get_text() if parsed_html.body else 'find me no text'
+		content = 'find me no text'
+		if parsed_html.find("div", {"id": "content"}):
+			#print('content tag')
+			content = parsed_html.find("div", {"id": "content"}).get_text()
+		elif parsed_html.main:
+			print('main tag')
+			content = parsed_html.main.get_text()
+		elif parsed_html.section:
+			print('section tag')
+			content = all_tags(parsed_html, 'section')
+		elif parsed_html.article:
+			print('article tag')
+			content = all_tags(parsed_html, 'content')
+		elif parsed_html.body:
+			print('body tag')
+			content = parsed_html.body.get_text()
 		title = parsed_html.title.get_text() if parsed_html.title else original_url
 		for key in metadata:
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
@@ -105,33 +113,30 @@ def parseContents(response, original_url):
 					title = schema['name']
 				for key in metadata:
 					if key in schema.keys():
-						metadata[key] = schema[key]
+						metadata[key] = schema[key].strip()
 			except:
 				pass
+		title = title.split(' | ')[0]
 		data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
 		for index, url in enumerate(page_urls):
 			clean_url = url['href']
-			print(clean_url)
 			if 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == None:
 				clean_url = urljoin(data_url, clean_url)
 			clean_url = clean_url.rstrip('/').strip()
-			#print(checkUrl(clean_url) and clean_url not in process_urls and clean_url not in all_data.keys() and any(url in clean_url for url in urls))
 			clean_url = clean_url.rsplit("#", 1)[0].strip()
-			if clean_url in missing_urls:
-				print(clean_url)
-				print(checkUrl(clean_url))
-				print(clean_url not in process_urls)
-				print(clean_url not in processed_urls)
-				if clean_url in all_data.keys():
-					print('in all data keys')
 			if checkUrl(clean_url):
 				process_urls.append(clean_url)
-				if clean_url in missing_urls:
-					print('its in there')
 	content = content if type(content) == str else str(content)
-	all_data[original_url] = metadata | {'content': content, 'title': title, 'urls_on_page': page_urls,
+	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
+	all_data[original_url] = metadata | {'id': original_url, 'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url
 	}
+	if solr_index:
+		solrdict = {k: v for k, v in all_data[original_url].items() if k in solrkeys}
+		solr = pysolr.Solr(solr_index, always_commit=True)
+		solr.add([
+		    solrdict
+		])
 	if response.url != original_url:
 		all_data[response.url] = all_data[original_url]
 	processed_urls.append(original_url)
@@ -141,6 +146,14 @@ def parseContents(response, original_url):
 	except Exception as e:
 		print('error removign')
 		print(e)
+
+
+def parse_type(sql_keys, key, value):
+	fieldtype = sql_keys[key]
+	if 'TEXT' in fieldtype:
+		return str(value)
+	elif fieldtype == 'INTEGER':
+		return int(value)
 
 for url in urls:
 	getContents(url)
@@ -166,25 +179,29 @@ while len(process_urls) > 0:
 
 conn = sqlite3.connect('crawl_db')
 c = conn.cursor()
-c.execute('''
-          CREATE TABLE IF NOT EXISTS crawls
-          ([crawl_url] TEXT PRIMARY KEY, [content] TEXT, [jsondata] TEXT)
-          ''')
+
+table = "crawls"
+
+my_keys = {element: 'TEXT' for element in crawlmetadata} | {'id' : 'TEXT PRIMARY KEY', 'content': 'TEXT', 'url': 'TEXT', 'title': 'TEXT','urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT'}
+table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
+c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
 conn.commit()
 
 for key, value in all_data.items():
-
 	try:
-		c.execute('''
-	      INSERT OR REPLACE INTO crawls (crawl_url, content, jsondata)
-	          VALUES
-	            (?, ?, ?)
-	    ''', (key, value['content'], json.dumps(value['schemamarkup'])))
+		sql = 'INSERT INTO {} ({}) VALUES ({})'.format(table,
+            ','.join(my_keys),
+            ','.join(['?']*len(my_keys)))
+		c.execute(sql, tuple([parse_type(my_keys, k, v) for k, v in value.items() if k in my_keys]))
 		conn.commit()
 	except Exception as e:
 		print(value['content'])
 		print(key)
 		print(e)
+
+res = c.execute("SELECT * FROM crawls")
+print(res)
+print(res.fetchall())
 
 existing = {k:v for k,v in all_data.items() if v['status_code'] < 400 and 'notfound' not in v['redirect_url']}
 print(len(all_data.keys()))
