@@ -13,6 +13,7 @@ TIMEOUT = 5
 settings = yaml.load(open("settings.yml"), Loader=yaml.FullLoader)
 regex_file = settings['regex_file']
 urls = open(settings['seed_file']).read().strip().split("\n")
+urls = ['https://www.lib.ncsu.edu/sites/default/files/pdf/2020-10/2020_orientation_guide_en.pdf']
 filters = open(regex_file).read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -66,12 +67,22 @@ def clean_keys(key):
 def parseContents(response, original_url):
 	content = ''
 	page_urls = None
-	title = original_url
 	schemamarkup = {}
-	metadata = {'id': original_url}
+	metadata = {'id': original_url, 'title': original_url.rsplit('/', 1)[-1]}
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
+			if read_pdf.metadata :
+				if read_pdf.metadata.title:
+					metadata['title'] = read_pdf.metadata.title
+					print(title)
+					print('kfjaldskfjlsak')
+				try:
+					metadata['keywords'] = read_pdf.metadata.keywords
+					print(metadata['keywords'])
+					print('kfjaldskfjlsak')
+				except:
+					pass
 			for page in range(len(read_pdf.pages)):
 				if "/Annots" in read_pdf.pages[page]:
 					for annot in read_pdf.pages[page]["/Annots"]:
@@ -105,7 +116,6 @@ def parseContents(response, original_url):
 		elif parsed_html.body:
 			#print('body tag')
 			content = parsed_html.body.get_text()
-		title = parsed_html.title.get_text() if parsed_html.title else original_url
 		for key in fields.keys():
 			meta_key = fields[key]['solr'] if 'solr' in fields[key].keys() else key
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
@@ -118,15 +128,12 @@ def parseContents(response, original_url):
 		if schemamarkup:
 			try:
 				schema = json.loads(schemamarkup)
-				if 'name' in schema.keys():
-					title = schema['name']
 				for key in fields.keys():
 					if key in schema.keys():
 						meta_key = fields[key]['solr'] if 'solr' in fields[key].keys() else key
 						metadata[meta_key] = schema[key].strip()
 			except:
 				pass
-		title = title.split(' | ')[0]
 		data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
 		for index, url in enumerate(page_urls):
 			clean_url = url['href']
@@ -140,10 +147,11 @@ def parseContents(response, original_url):
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
 	if 'id_field' in settings.keys() and settings['id_field']:
 		metadata['id'] = metadata[settings['id_field']]
-	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
+	print(metadata)
+	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
-	if solr_index and response.status_code < 400 and 'page not found' not in title:
+	if solr_index and response.status_code < 400:
 		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
 		solr.add([
