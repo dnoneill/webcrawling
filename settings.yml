@@ -28,7 +28,7 @@ fields:
   'content':
     solr: 'content'
     type: 'text'
-  'name':
+  'title':
     solr: 'title'
     type: 'text'
     

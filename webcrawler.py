@@ -26,7 +26,8 @@ retry_urls = []
 solr_index = settings['solr_index']
 fields = settings['fields']
 solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys()}
-
+solrkeys['id'] = 'text'
+solrkeys['url'] = 'text'
 
 def checkUrl(url):
 	negmatch = re.search(r'{}'.format(negativefilters), url)
@@ -37,15 +38,15 @@ def checkUrl(url):
 		return False
 
 def getContents(url):
-	print(url)
+	#print(url)
 	try:
 		response = requests.get(url)
 		parseContents(response, url)
 	except Exception as e:
-		print(e)
+		#print(e)
 		retry_urls.append(url)
 		process_urls.remove(url)
-		print('*******problem url {}*******'.format(url))
+		#print('*******problem url {}*******'.format(url))
 	return 'FALJDFLDAKJFADSLKJFALKDJFALKSJFLKASDJFALSKDJFALKSDJ'
 	
 def getHTTP(text):
@@ -74,12 +75,12 @@ def parseContents(response, original_url):
 			if read_pdf.metadata :
 				if read_pdf.metadata.title:
 					metadata['title'] = read_pdf.metadata.title
-					print(metadata['title'])
-					print('kfjaldskfjlsak')
+					# print(metadata['title'])
+					# print('kfjaldskfjlsak')
 				try:
 					metadata['keywords'] = read_pdf.metadata.keywords
-					print(metadata['keywords'])
-					print('kfjaldskfjlsak')
+					# print(metadata['keywords'])
+					# print('kfjaldskfjlsak')
 				except:
 					pass
 			for page in range(len(read_pdf.pages)):
@@ -100,6 +101,7 @@ def parseContents(response, original_url):
 	else:
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
 		content = 'find me no text'
+		metadata['title'] = parsed_html.title.get_text() if parsed_html.title else metadata['title']
 		if parsed_html.find("div", {"id": "content"}):
 			#print('content tag')
 			content = parsed_html.find("div", {"id": "content"}).get_text()
@@ -149,7 +151,7 @@ def parseContents(response, original_url):
 	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
-	if solr_index and response.status_code < 400:
+	if solr_index and response.status_code < 400 and 'not found' not in metadata['title']:
 		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
 		solr.add([
@@ -162,6 +164,7 @@ def parseContents(response, original_url):
 	try:
 		process_urls.remove(original_url)
 	except Exception as e:
+		pass
 		print('error removign')
 		print(e)
 
@@ -187,9 +190,9 @@ while len(process_urls) > 0:
 		future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
 		time1 = time.time()
 		for future in concurrent.futures.as_completed(future_to_url):
-			print('all_data {}'.format(len(all_data.keys())))
+			#print('all_data {}'.format(len(all_data.keys())))
 			pass
-			print('process_urls {}'.format(len(process_urls)))
+			#print('process_urls {}'.format(len(process_urls)))
 	time2 = time.time()
 	# process_urls = list(set(process_urls))
 	# print(len(process_urls))
@@ -217,7 +220,8 @@ for key, value in all_data.items():
 		c.execute(sql, tuple([parse_type(my_keys, k, v) for k, v in value.items() if k in my_keys]))
 		conn.commit()
 	except Exception as e:
-		print(value['content'])
+		pass
+		# print(value['content'])
 		print(key)
 		print(e)
 
@@ -226,7 +230,7 @@ res = c.execute("SELECT * FROM crawls")
 # print(res.fetchall())
 
 existing = {k:v for k,v in all_data.items() if v['status_code'] < 400 and 'notfound' not in v['redirect_url'] and 'not found' not in v['title']}
-print(len(all_data.keys()))
-print(list(all_data.keys()))
+# print(len(all_data.keys()))
+# print(list(all_data.keys()))
 print(len(existing.keys()))
 print(existing.keys())
