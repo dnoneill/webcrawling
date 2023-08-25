@@ -26,6 +26,8 @@ retry_urls = []
 solr_index = settings['solr_index']
 fields = settings['fields']
 solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys()}
+
+
 def checkUrl(url):
 	negmatch = re.search(r'{}'.format(negativefilters), url)
 	positivematch = re.search(r'{}'.format(positivefilters), url)
@@ -66,7 +68,7 @@ def parseContents(response, original_url):
 	page_urls = None
 	title = original_url
 	schemamarkup = {}
-	metadata = {}
+	metadata = {'id': original_url}
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -136,9 +138,12 @@ def parseContents(response, original_url):
 				process_urls.append(clean_url)
 	content = content if type(content) == str else str(content)
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
-	all_data[original_url] = {**metadata, **{'id': original_url, 'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
-		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url}
+	if 'id_field' in settings.keys() and settings['id_field']:
+		metadata['id'] = metadata[settings['id_field']]
+	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
+		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
+	print(metadata)
 	if solr_index and response.status_code < 400 and 'page not found' not in title:
 		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
@@ -194,7 +199,7 @@ c = conn.cursor()
 
 table = "crawls"
 
-my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT'}}
+my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT'}}
 table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
 c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
 conn.commit()
