@@ -13,7 +13,6 @@ TIMEOUT = 5
 settings = yaml.load(open("settings.yml"), Loader=yaml.FullLoader)
 regex_file = settings['regex_file']
 urls = open(settings['seed_file']).read().strip().split("\n")
-urls = ['https://www.lib.ncsu.edu/sites/default/files/pdf/2020-10/2020_orientation_guide_en.pdf']
 filters = open(regex_file).read().strip().split("\n")
 filters = list(filter(lambda x: x.startswith('#') == False and x, filters))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
@@ -75,7 +74,7 @@ def parseContents(response, original_url):
 			if read_pdf.metadata :
 				if read_pdf.metadata.title:
 					metadata['title'] = read_pdf.metadata.title
-					print(title)
+					print(metadata['title'])
 					print('kfjaldskfjlsak')
 				try:
 					metadata['keywords'] = read_pdf.metadata.keywords
@@ -147,7 +146,6 @@ def parseContents(response, original_url):
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
 	if 'id_field' in settings.keys() and settings['id_field']:
 		metadata['id'] = metadata[settings['id_field']]
-	print(metadata)
 	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
