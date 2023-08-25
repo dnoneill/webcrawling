@@ -25,11 +25,12 @@ fields:
     type: 'text'
   'eventStatus':
     type: 'text'
-  'url':
+  'content':
+    solr: 'content'
     type: 'text'
-    solr: 'id'
 
 regex_file: "regex-urlfilter.txt"
 
-solr_index: 'http://solr:8983/solr/nutch'
+solr_index: ''
+#solr_index: 'http://solr:8983/solr/nutch'
 seed_file: "seed.txt"
