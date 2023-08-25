@@ -28,9 +28,13 @@ fields:
   'content':
     solr: 'content'
     type: 'text'
+  'name':
+    solr: 'title'
+    type: 'text'
+    
+#id_field: 'image'
 
 regex_file: "regex-urlfilter.txt"
 
-solr_index: ''
-#solr_index: 'http://solr:8983/solr/nutch'
+solr_index: 'http://solr:8983/solr/nutch'
 seed_file: "seed.txt"
