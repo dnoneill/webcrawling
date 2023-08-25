@@ -143,7 +143,6 @@ def parseContents(response, original_url):
 	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'title': title, 'urls_on_page': page_urls,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
-	print(metadata)
 	if solr_index and response.status_code < 400 and 'page not found' not in title:
 		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
