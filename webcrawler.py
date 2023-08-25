@@ -122,7 +122,8 @@ def parseContents(response, original_url):
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
 			get_content = get_content if get_content else parsed_html.find("meta",  {"property":"{}".format(key)})
 			get_content = get_content["content"] if get_content else ''
-			metadata[meta_key] = get_content
+			if get_content:
+				metadata[meta_key] = get_content
 		page_urls = parsed_html.find_all(href=True)
 		schemamarkup = parsed_html.find("script", {"type": "application/ld+json"})
 		schemamarkup = schemamarkup.get_text("|", strip=True) if schemamarkup else schemamarkup
@@ -130,7 +131,7 @@ def parseContents(response, original_url):
 			try:
 				schema = json.loads(schemamarkup)
 				for key in fields.keys():
-					if key in schema.keys():
+					if key in schema.keys() and schema[key]:
 						meta_key = fields[key]['solr'] if 'solr' in fields[key].keys() else key
 						metadata[meta_key] = schema[key].strip()
 			except:
