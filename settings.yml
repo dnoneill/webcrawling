@@ -36,5 +36,5 @@ fields:
 
 regex_file: "regex-urlfilter.txt"
 
-solr_index: 'http://solr:8983/solr/nutch'
+solr_index: ''
 seed_file: "seed.txt"
