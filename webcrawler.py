@@ -165,7 +165,8 @@ def parseContents(response, original_url):
 	processed_urls.append(response.url)
 	try:
 		process_urls.remove(original_url)
-		process_urls.remove(response.url)
+		if response.url != original_url and response.url in process_urls:
+			process_urls.remove(response.url)
 	except Exception as e:
 		pass
 		print('error removign')
