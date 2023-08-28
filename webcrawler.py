@@ -28,6 +28,7 @@ fields = settings['fields']
 solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys()}
 solrkeys['id'] = 'text'
 solrkeys['url'] = 'text'
+content_field = settings['content_field'] if 'content_field' in settings.keys() else None
 
 def checkUrl(url):
 	negmatch = re.search(r'{}'.format(negativefilters), url)
@@ -68,7 +69,8 @@ def parseContents(response, original_url):
 	content = ''
 	page_urls = None
 	schemamarkup = {}
-	metadata = {'id': original_url, 'title': original_url.rsplit('/', 1)[-1]}
+	data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
+	metadata = {'id': data_url, 'title': original_url.rsplit('/', 1)[-1]}
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -102,9 +104,9 @@ def parseContents(response, original_url):
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
 		content = 'find me no text'
 		metadata['title'] = parsed_html.title.get_text() if parsed_html.title else metadata['title']
-		if parsed_html.find("div", {"id": "content"}):
+		if content_field and parsed_html.find(content_field['tag'], {"id": content_field['id']}):
 			#print('content tag')
-			content = parsed_html.find("div", {"id": "content"}).get_text()
+			content = parsed_html.find(content_field['tag'], {"id": content_field['id']}).get_text()
 		elif parsed_html.main:
 			#print('main tag')
 			content = parsed_html.main.get_text()
@@ -136,7 +138,6 @@ def parseContents(response, original_url):
 						metadata[meta_key] = schema[key].strip()
 			except:
 				pass
-		data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
 		for index, url in enumerate(page_urls):
 			clean_url = url['href']
 			if 'http' not in clean_url and re.match(r'{}'.format(negativefilters), clean_url) == None:
@@ -149,21 +150,22 @@ def parseContents(response, original_url):
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
 	if 'id_field' in settings.keys() and settings['id_field']:
 		metadata['id'] = metadata[settings['id_field']]
-	all_data[original_url] = {**metadata, **{'url': original_url ,'content': content, 'urls_on_page': page_urls,
+	all_data[data_url] = {**metadata, **{'url': data_url ,'content': content, 'urls_on_page': page_urls, 'original_url': original_url,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
 	if solr_index and response.status_code < 400 and 'not found' not in metadata['title']:
-		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[original_url].items() if k in solrkeys.keys() and v != ''}
+		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[data_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
 		solr.add([
 		    solrdict
 		])
-	if response.url != original_url:
-		all_data[response.url] = all_data[original_url]
+	# if response.url != original_url:
+	# 	all_data[response.url] = all_data[original_url]
 	processed_urls.append(original_url)
 	processed_urls.append(response.url)
 	try:
 		process_urls.remove(original_url)
+		process_urls.remove(response.url)
 	except Exception as e:
 		pass
 		print('error removign')
@@ -208,7 +210,7 @@ c = conn.cursor()
 
 table = "crawls"
 
-my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT'}}
+my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'original_url': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT'}}
 table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
 c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
 conn.commit()
@@ -233,5 +235,5 @@ res = c.execute("SELECT * FROM crawls")
 existing = {k:v for k,v in all_data.items() if v['status_code'] < 400 and 'notfound' not in v['redirect_url'] and 'not found' not in v['title']}
 # print(len(all_data.keys()))
 # print(list(all_data.keys()))
-print(len(existing.keys()))
-print(existing.keys())
+# print(len(existing.keys()))
+# print(existing.keys())
