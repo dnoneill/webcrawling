@@ -33,8 +33,11 @@ fields:
     type: 'text'
     
 #id_field: 'image'
+content_field:
+  tag: "div"
+  id: "content"
 
 regex_file: "regex-urlfilter.txt"
 
-solr_index: ''
+solr_index: 'http://solr:8983/solr/nutch'
 seed_file: "seed.txt"
