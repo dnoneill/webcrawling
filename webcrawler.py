@@ -36,7 +36,6 @@ solrkeys['url'] = 'text'
 content_field = settings['content_field'] if 'content_field' in settings.keys() else None
 logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
 
-
 def checkUrl(url):
 	if (checkIndex(url) or checkCrawl(url)) and 'http' in url and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
 		return True
