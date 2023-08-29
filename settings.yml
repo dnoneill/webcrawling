@@ -31,8 +31,12 @@ fields:
   'title':
     solr: 'title'
     type: 'text'
+
     
 #id_field: 'image'
+content_field:
+  tag: "div"
+  id: "content"
 
 regex_file: "regex-urlfilter.txt"
 
