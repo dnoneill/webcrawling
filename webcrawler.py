@@ -8,9 +8,12 @@ import sqlite3
 import pysolr, yaml
 from dateutil import parser
 import logging
+import datetime
 import gc
+from time import sleep
+gc.set_threshold(0)
 
-CONNECTIONS = 1000
+CONNECTIONS = 100
 TIMEOUT = 5
 settings = yaml.load(open("settings.yml"), Loader=yaml.FullLoader)
 regex_file = settings['regex_file']
@@ -22,12 +25,14 @@ negativefilters = "|".join(list(map(lambda x: x.strip('-'),negativefilters)))
 positivefilters = list(filter(lambda x: x.startswith('+'), filters))
 positivefilters = "|".join(list(map(lambda x: x.strip('+'),positivefilters)))
 crawlitems = list(filter(lambda x: x and x.startswith('crawl'), filterfile))
+print(crawlitems)
 crawlitems = "|".join(list(map(lambda x: x and x.split('crawl')[-1], crawlitems)))
 
 all_data = {}
 process_urls = []
 processed_urls = []
 retry_urls = []
+crawlonly = []
 solr_index = settings['solr_index']
 fields = settings['fields']
 solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys()}
@@ -35,6 +40,20 @@ solrkeys['id'] = 'text'
 solrkeys['url'] = 'text'
 content_field = settings['content_field'] if 'content_field' in settings.keys() else None
 logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
+
+conn = sqlite3.connect('crawl_db')
+c = conn.cursor()
+
+table = "crawls"
+
+def clean_keys(key):
+	return "".join(re.findall("[a-zA-Z]+", key))
+
+my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'original_url': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT'}}
+table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
+c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
+conn.commit()
+
 
 def checkUrl(url):
 	if (checkIndex(url) or checkCrawl(url)) and 'http' in url and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
@@ -57,7 +76,7 @@ def checkCrawl(url):
 		return False
 
 def getContents(url):
-	#print(url)
+	print(url)
 	try:
 		response = requests.get(url)
 		parseContents(response, url)
@@ -81,15 +100,27 @@ def all_tags(parsed_html, tag):
 	return " ".join(list(map(lambda x: x.get_text(), parsed_html.find_all(tag))))
 
 
-def clean_keys(key):
-	return "".join(re.findall("[a-zA-Z]+", key))
+def writeToDB(value):
+	try:
+		sql = 'INSERT or IGNORE INTO {} ({}) VALUES ({})'.format(table,
+            ','.join(my_keys.keys()),
+            ','.join(['?']*len(my_keys)))
+		c.execute(sql, tuple([parse_type(my_keys, k, v) for k, v in value.items() if k in my_keys]))
+		conn.commit()
+	except Exception as e:
+		pass
+		# print(value['content'])
+		print(value['url'])
+		print(e)
 
 def parseContents(response, original_url):
 	content = ''
 	page_urls = None
 	schemamarkup = {}
 	data_url = original_url if response.url == original_url and original_url.replace('https://', '').split('/')[0] not in response.url else response.url
-	metadata = {'id': data_url, 'title': original_url.rsplit('/', 1)[-1]}
+	metadata = {key: '' for key in my_keys}
+	metadata['id'] = data_url
+	metadata['title'] = original_url.rsplit('/', 1)[-1]
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -172,9 +203,11 @@ def parseContents(response, original_url):
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
 	if 'id_field' in settings.keys() and settings['id_field']:
 		metadata['id'] = metadata[settings['id_field']]
+	metadata['tstamp'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 	all_data[data_url] = {**metadata, **{'url': data_url ,'content': content, 'urls_on_page': page_urls, 'original_url': original_url,
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
+	writeToDB(all_data[data_url])
 	if solr_index and response.status_code < 400 and 'not found' not in metadata['title'] and checkIndex(original_url):
 		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data[data_url].items() if k in solrkeys.keys() and v != ''}
 		solr = pysolr.Solr(solr_index, always_commit=True)
@@ -195,6 +228,8 @@ def parseContents(response, original_url):
 		pass
 		# print('error removign')
 		# print(e)
+	print('finished')
+	#time.sleep(2)
 
 
 def parse_type(sql_keys, key, value):
@@ -211,18 +246,20 @@ def parse_type(sql_keys, key, value):
 for url in urls:
 	getContents(url)
 
+
+CONNECTIONS = 500
 while len(process_urls) > 0:
 	with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
 		# print([url for url in process_urls[0:CONNECTIONS]])
 		# print('100 urls')
 		future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
-		time1 = time.time()
 		for future in concurrent.futures.as_completed(future_to_url):
-			gc.collect()
 			#print('all_data {}'.format(len(all_data.keys())))
 			pass
 			#print('process_urls {}'.format(len(process_urls)))
-	time2 = time.time()
+		print('all_data {}'.format(len(all_data.keys())))
+		print('process_urls {}'.format(len(process_urls)))
+		gc.collect()
 	# process_urls = list(set(process_urls))
 	# print(len(process_urls))
 	# if process_urls[0] not in processed_urls:
@@ -230,29 +267,7 @@ while len(process_urls) > 0:
 	# else:
 	# 	print('else statement')
 	# 	process_urls.remove(process_urls[0])
-
-conn = sqlite3.connect('crawl_db')
-c = conn.cursor()
-
-table = "crawls"
-
-my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'original_url': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT'}}
-table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
-c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
-conn.commit()
-
-for key, value in all_data.items():
-	try:
-		sql = 'INSERT INTO {} ({}) VALUES ({})'.format(table,
-            ','.join(my_keys.keys()),
-            ','.join(['?']*len(my_keys)))
-		c.execute(sql, tuple([parse_type(my_keys, k, v) for k, v in value.items() if k in my_keys]))
-		conn.commit()
-	except Exception as e:
-		pass
-		# print(value['content'])
-		print(key)
-		print(e)
+	
 
 res = c.execute("SELECT * FROM crawls")
 # print(res)
