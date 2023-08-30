@@ -247,7 +247,7 @@ for url in urls:
 	getContents(url)
 
 
-CONNECTIONS = 500
+CONNECTIONS = 50
 while len(process_urls) > 0:
 	with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
 		# print([url for url in process_urls[0:CONNECTIONS]])
