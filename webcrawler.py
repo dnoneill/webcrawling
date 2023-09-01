@@ -56,9 +56,10 @@ c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_col
 c.execute("select * from {} limit 1".format(table))
 col_name=[i[0] for i in c.description]
 missing_columns = list(filter(lambda x: x not in col_name, my_keys.keys()))
+print(missing_columns)
 if len(missing_columns) > 0:
 	for col in missing_columns:
-		c.execute("ALTER TABLE " + table + " ADD COLUMN col {}".format(my_keys[col]))
+		c.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, col, my_keys[col]))
 conn.commit()
 
 
