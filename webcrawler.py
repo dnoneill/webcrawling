@@ -6,12 +6,12 @@ from urllib.parse import urljoin
 import concurrent.futures
 import sqlite3
 import pysolr, yaml
-from dateutil import parser
+from dateutil import parser as dateparser
 import logging
 from datetime import datetime, timedelta,timezone
 import gc
 from time import sleep
-import sys
+import argparse
 
 gc.set_threshold(0)
 
@@ -56,19 +56,18 @@ c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_col
 c.execute("select * from {} limit 1".format(table))
 col_name=[i[0] for i in c.description]
 missing_columns = list(filter(lambda x: x not in col_name, my_keys.keys()))
-print(missing_columns)
+
 if len(missing_columns) > 0:
 	for col in missing_columns:
 		c.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, col, my_keys[col]))
 conn.commit()
 
-
 def checkUrl(url):
-	if '--refresh' not in sys.argv:
+	if args.refresh is False:
 		query = "SELECT crawled FROM crawls WHERE id = '{}'".format(url)
 		res = c.execute(query)
 		crawled = res.fetchone()
-		crawled = parser.parse(crawled[0]) if crawled else datetime.now(timezone.utc) - timedelta(days=3*365)
+		crawled = dateparser.parse(crawled[0]) if crawled != None else datetime.now(timezone.utc) - timedelta(days=3*365)
 		if (datetime.now(timezone.utc) - crawled).days < settings['days_between']:
 			return False
 	if (checkIndex(url) or checkCrawl(url)) and 'http' in url and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
@@ -122,6 +121,18 @@ def writeToDB(value):
 		conn.commit()
 	except Exception as e:
 		logging.warning('*******problem writing {} to db: {}'.format(value['url'], e))
+
+def indexInSolr(all_data):
+	isindexable = all_data['status_code'] < 400 and 'not found' not in all_data['title'] and checkIndex(all_data['original_url'])
+	if solr_index and isindexable:
+		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data.items() if k in solrkeys.keys() and v != ''}
+		solr = pysolr.Solr(solr_index, always_commit=True)
+		solr.add([
+		    solrdict
+		])
+	elif solr_index and checkIndex(all_data['original_url']):
+		logging.warning('*******{} responded {}*******'.format(all_data['original_url'], all_data['status_code']))
+
 
 def parseContents(response, original_url):
 	content = ''
@@ -209,14 +220,7 @@ def parseContents(response, original_url):
 		'schemamarkup': schemamarkup, 'status_code': response.status_code, 'redirect_url': response.url, 'raw_content': response.content}
 	}
 	writeToDB(all_data)
-	if solr_index and response.status_code < 400 and 'not found' not in metadata['title'] and checkIndex(original_url):
-		solrdict = {k: parse_type(solrkeys, k, v) for k, v in all_data.items() if k in solrkeys.keys() and v != ''}
-		solr = pysolr.Solr(solr_index, always_commit=True)
-		solr.add([
-		    solrdict
-		])
-	elif solr_index and checkIndex(original_url):
-		logging.warning('*******{} responded {}*******'.format(response.url, response.status_code))
+	indexInSolr(all_data)
 	processed_urls.append(original_url)
 	processed_urls.append(response.url)
 	try:
@@ -234,25 +238,41 @@ def parse_type(sql_keys, key, value):
 	elif fieldtype.lower() == 'integer':
 		return int(value)
 	elif fieldtype.lower() == 'date' and value:
-		return parser.parse(value).strftime("%Y-%m-%dT%H:%M:%SZ")
+		return dateparser.parse(value).strftime("%Y-%m-%dT%H:%M:%SZ")
 	else:
 		return str(value)
 
 
 def main():
-	for url in urls:
-		getContents(url)
-	while len(process_urls) > 0:
-		with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
-			print(len(process_urls))
-			future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
-			for future in concurrent.futures.as_completed(future_to_url):
-				pass
-			gc.collect()
+	if args.function:
+		if args.function == 'index':
+			if settings['solr_index']:
+				conn.row_factory = sqlite3.Row
+				c = conn.cursor()
+				res = c.execute("SELECT * FROM crawls")
+				crawls = res.fetchall()
+				for item in crawls:
+					indexInSolr(dict(item))
+			else:
+				print('\n You are missing the variable "solr_index" which is set in the settings.yml file. Please set and try running again"')
+		elif args.function == 'crawl':
+			for url in urls[0:1]:
+				getContents(url)
+			while len(process_urls) > 0:
+				with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
+					future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
+					for future in concurrent.futures.as_completed(future_to_url):
+						pass
+					gc.collect()
+	else:
+		print('\nYou are missing required positional argument crawl or index. i.e. python3 webcrawler.py crawl or python3 webcrawler.py index\n')
 
-main()
+if __name__ == '__main__':
+	parser=argparse.ArgumentParser(
+	description='''My Description. And what a lovely description it is. ''')
+	parser.add_argument('--refresh', type=int, default=False, help='FOO!')
+	parser.add_argument('function', default=None, help='BAR!')
+	args=parser.parse_args()
+	main()
 	
-
-res = c.execute("SELECT * FROM crawls")
-print(len(res.fetchall()))
 
