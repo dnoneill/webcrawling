@@ -30,14 +30,14 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: run script
       run: |
-        python webcrawler.py
+        python webcrawler.py crawl
     - name: commit files
       run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git config pull.rebase false
           git pull origin main
-          git add -A
+          git add *.log
           git commit -m "data from script" -a || echo "No changes to commit"
     - name: push changes
       uses: ad-m/github-push-action@v0.6.0
