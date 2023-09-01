@@ -42,3 +42,4 @@ regex_file: "regex-urlfilter.txt"
 
 solr_index: ''
 seed_file: "seed.txt"
+days_between: 2
