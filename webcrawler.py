@@ -254,7 +254,7 @@ def main():
 				for item in crawls:
 					indexInSolr(dict(item))
 			else:
-				print('\n You are missing the variable "solr_index" which is set in the settings.yml file. Please set and try running again"')
+				print('\n You are missing the variable "solr_index" which is set in the settings.yml file. Please update the file with the correct variable and try running again. \n')
 		elif args.function == 'crawl':
 			for url in urls[0:1]:
 				getContents(url)
@@ -265,7 +265,7 @@ def main():
 						pass
 					gc.collect()
 	else:
-		print('\nYou are missing required positional argument crawl or index. i.e. python3 webcrawler.py crawl or python3 webcrawler.py index\n')
+		print('\n You are missing required positional argument crawl or index. i.e. python3 webcrawler.py crawl or python3 webcrawler.py index. \n')
 
 if __name__ == '__main__':
 	parser=argparse.ArgumentParser(
@@ -274,5 +274,3 @@ if __name__ == '__main__':
 	parser.add_argument('function', default=None, help='BAR!')
 	args=parser.parse_args()
 	main()
-	
-
