@@ -53,6 +53,12 @@ def clean_keys(key):
 my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'original_url': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT', 'crawled': 'DATE'}}
 table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
 c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
+c.execute("select * from {} limit 1".format(table))
+col_name=[i[0] for i in c.description]
+missing_columns = list(filter(lambda x: x not in col_name, my_keys.keys()))
+if len(missing_columns) > 0:
+	for col in missing_columns:
+		c.execute("ALTER TABLE " + table + " ADD COLUMN col {}".format(my_keys[col]))
 conn.commit()
 
 
@@ -237,6 +243,7 @@ def main():
 		getContents(url)
 	while len(process_urls) > 0:
 		with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
+			print(len(process_urls))
 			future_to_url = (executor.submit(getContents(url), url, TIMEOUT) for url in process_urls[0:CONNECTIONS])
 			for future in concurrent.futures.as_completed(future_to_url):
 				pass
