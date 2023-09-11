@@ -63,16 +63,19 @@ if len(missing_columns) > 0:
 conn.commit()
 
 def checkUrl(url):
-	if args.refresh is False:
-		query = "SELECT crawled, status_code FROM crawls WHERE original_url = '{}' OR id = '{}'".format(url, url)
-		res = c.execute(query)
-		dbitem = res.fetchone()
-		crawled = dateparser.parse(dbitem[0]) if dbitem != None else datetime.now(timezone.utc) - timedelta(days=3*365)
-		status_code = dbitem[1] if dbitem != None else 200
-		if (datetime.now(timezone.utc) - crawled).days < settings['days_between'] and status_code < 399:
-			return False
 	if (checkIndex(url) or checkCrawl(url)) and 'http' in url and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
-		return True
+		if args.refresh is False:
+			query = "SELECT crawled, status_code FROM crawls WHERE original_url = '{}' OR id = '{}'".format(url, url)
+			res = c.execute(query)
+			dbitem = res.fetchone()
+			crawled = dateparser.parse(dbitem[0]) if dbitem != None else datetime.now(timezone.utc) - timedelta(days=3*365)
+			status_code = dbitem[1] if dbitem != None else 200
+			if (datetime.now(timezone.utc) - crawled).days < settings['days_between'] and status_code < 399:
+				return False
+			else:
+				return True
+		else:
+			return True
 	else:
 		return False
 
@@ -275,3 +278,5 @@ if __name__ == '__main__':
 	parser.add_argument('function', default=None, help='BAR!')
 	args=parser.parse_args()
 	main()
+	
+
