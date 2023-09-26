@@ -40,32 +40,20 @@ solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys(
 solrkeys['id'] = 'text'
 solrkeys['url'] = 'text'
 content_field = settings['content_field'] if 'content_field' in settings.keys() else None
-logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
-
-conn = sqlite3.connect('crawl_db')
-c = conn.cursor()
-
+db_name = 'crawl_db'
 table = "crawls"
+
+logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
 
 def clean_keys(key):
 	return "".join(re.findall("[a-zA-Z]+", key))
 
-my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'urls_on_page': 'TEXT', 'original_url': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT', 'crawled': 'DATE'}}
-table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
-c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
-c.execute("select * from {} limit 1".format(table))
-col_name=[i[0] for i in c.description]
-missing_columns = list(filter(lambda x: x not in col_name, my_keys.keys()))
-
-if len(missing_columns) > 0:
-	for col in missing_columns:
-		c.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, col, my_keys[col]))
-conn.commit()
+my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'urls_on_page': 'TEXT', 'original_url': 'TEXT', 'schemamarkup': 'TEXT', 'status_code': 'INTEGER', 'redirect_url': 'TEXT', 'raw_content': 'TEXT', 'crawled': 'DATE'}}
 
 def checkUrl(url):
 	if (checkIndex(url) or checkCrawl(url)) and 'http' in url and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
 		if args.refresh is False:
-			query = "SELECT crawled, status_code FROM crawls WHERE original_url = '{}' OR id = '{}'".format(url, url)
+			query = "SELECT crawled, status_code FROM {} WHERE original_url = '{}' OR id = '{}'".format(table, url, url)
 			res = c.execute(query)
 			dbitem = res.fetchone()
 			crawled = dateparser.parse(dbitem[0]) if dbitem != None else datetime.now(timezone.utc) - timedelta(days=3*365)
@@ -94,7 +82,6 @@ def checkCrawl(url):
 		return False
 
 def getContents(url):
-	print(url)
 	try:
 		response = requests.get(url)
 		parseContents(response, url)
@@ -117,6 +104,7 @@ def all_tags(parsed_html, tag):
 
 
 def writeToDB(value):
+	conn, c = connectToDB()
 	try:
 		sql = 'INSERT or IGNORE INTO {} ({}) VALUES ({})'.format(table,
             ','.join(my_keys.keys()),
@@ -125,6 +113,7 @@ def writeToDB(value):
 		conn.commit()
 	except Exception as e:
 		logging.warning('*******problem writing {} to db: {}'.format(value['url'], e))
+	conn.close()
 
 def indexInSolr(all_data):
 	isindexable = all_data['status_code'] < 400 and 'not found' not in all_data['title'] and checkIndex(all_data['original_url'])
@@ -137,6 +126,10 @@ def indexInSolr(all_data):
 	elif solr_index and checkIndex(all_data['original_url']):
 		logging.warning('*******{} responded {}*******'.format(all_data['original_url'], all_data['status_code']))
 
+def deleteFromSolr(items):
+	for item in items:
+		solr = pysolr.Solr(solr_index, always_commit=True)
+		solr.delete(id='{}'.format(item))
 
 def parseContents(response, original_url):
 	content = ''
@@ -146,6 +139,7 @@ def parseContents(response, original_url):
 	metadata = {key: '' for key in my_keys}
 	metadata['id'] = data_url
 	metadata['title'] = original_url.rsplit('/', 1)[-1]
+
 	if original_url.lower().endswith('.pdf') and response.status_code < 400:
 		with BytesIO(response.content) as data:
 			read_pdf = PyPDF2.PdfReader(data)
@@ -246,21 +240,41 @@ def parse_type(sql_keys, key, value):
 	else:
 		return str(value)
 
+def connectToDB():
+	conn = sqlite3.connect(db_name)
+	c = conn.cursor()
+	return conn, c
+
+def checkDB():
+	conn, c = connectToDB()
+	table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
+	c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
+	c.execute("select * from {} limit 1".format(table))
+	col_name=[i[0] for i in c.description]
+	missing_columns = list(filter(lambda x: x not in col_name, my_keys.keys()))
+
+	if len(missing_columns) > 0:
+		for col in missing_columns:
+			c.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, col, my_keys[col]))
+	conn.commit()
+	conn.close()
 
 def main():
 	if args.function:
 		if args.function == 'index':
 			if settings['solr_index']:
+				conn, c = connectToDB()
 				conn.row_factory = sqlite3.Row
 				c = conn.cursor()
-				res = c.execute("SELECT * FROM crawls")
+				res = c.execute("SELECT * FROM {}".format(table))
 				crawls = res.fetchall()
 				for item in crawls:
 					indexInSolr(dict(item))
 			else:
 				print('\n You are missing the variable "solr_index" which is set in the settings.yml file. Please update the file with the correct variable and try running again. \n')
 		elif args.function == 'crawl':
-			for url in urls[0:1]:
+			checkDB()
+			for url in urls:
 				getContents(url)
 			while len(process_urls) > 0:
 				with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
@@ -268,14 +282,25 @@ def main():
 					for future in concurrent.futures.as_completed(future_to_url):
 						pass
 					gc.collect()
+			if args.refresh is True:
+				conn, c = connectToDB()
+				conn.row_factory = sqlite3.Row
+				c = conn.cursor()
+				res = c.execute("SELECT id FROM {} WHERE crawled < '{}'".format(table, datetime.now(timezone.utc) - timedelta(days=1)))
+				deleteitems = tuple(map(lambda x: x['id'], res.fetchall()))
+				c.execute("DELETE FROM {} WHERE id IN {}".format(table, deleteitems))
+				conn.commit()
+				if settings['solr_index']:
+					deleteFromSolr(list(deleteitems))
+				conn.close()	
 	else:
 		print('\n You are missing required positional argument crawl or index. i.e. python3 webcrawler.py crawl or python3 webcrawler.py index. \n')
 
 if __name__ == '__main__':
 	parser=argparse.ArgumentParser(
-	description='''My Description. And what a lovely description it is. ''')
-	parser.add_argument('--refresh', type=int, default=False, help='FOO!')
-	parser.add_argument('function', default=None, help='BAR!')
+	description='''Webcrawling script for crawling a list of webpages.''')
+	parser.add_argument('--refresh', type=bool, default=False, help='True or False value; will delete db and crawl all pages from scratch.')
+	parser.add_argument('function', default=None, help='The name of what you want the the script to do. Options are: index and crawl')
 	args=parser.parse_args()
 	main()
 	
