@@ -9,7 +9,7 @@ import pysolr, yaml
 from dateutil import parser as dateparser
 import logging
 from datetime import datetime, timedelta,timezone
-import gc
+import gc, csv
 from time import sleep
 import argparse
 
@@ -28,6 +28,7 @@ positivefilters = list(filter(lambda x: x.startswith('+'), filters))
 positivefilters = "|".join(list(map(lambda x: x.strip('+'),positivefilters)))
 crawlitems = list(filter(lambda x: x and x.startswith('crawl'), filterfile))
 crawlitems = "|".join(list(map(lambda x: x and x.split('crawl')[-1], crawlitems)))
+deadlinkfieldnames = ['on page', 'url', 'link', 'anchor', 'code']
 
 all_data = {}
 process_urls = []
@@ -42,7 +43,8 @@ solrkeys['url'] = 'text'
 content_field = settings['content_field'] if 'content_field' in settings.keys() else None
 db_name = 'crawl_db'
 table = "crawls"
-
+external_links_db = "external_links_db"
+external_db_fields = {'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'on_pages': 'TEXT'}
 logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
 
 def clean_keys(key):
@@ -53,6 +55,7 @@ my_keys = {**{clean_keys(k): v['type'].upper() for k, v in fields.items()}, **{'
 def checkUrl(url):
 	if (checkIndex(url) or checkCrawl(url)) and 'http' in url and url not in process_urls and url not in processed_urls and url.strip('/') not in process_urls and url.strip('/') not in processed_urls:
 		if args.refresh is False:
+			conn, c = connectToDB()
 			query = "SELECT crawled, status_code FROM {} WHERE original_url = '{}' OR id = '{}'".format(table, url, url)
 			res = c.execute(query)
 			dbitem = res.fetchone()
@@ -82,6 +85,7 @@ def checkCrawl(url):
 		return False
 
 def getContents(url):
+	#print(url)
 	try:
 		response = requests.get(url)
 		parseContents(response, url)
@@ -103,8 +107,8 @@ def all_tags(parsed_html, tag):
 	return " ".join(list(map(lambda x: x.get_text(), parsed_html.find_all(tag))))
 
 
-def writeToDB(value):
-	conn, c = connectToDB()
+def writeToDB(value, my_keys=my_keys, db_name=db_name):
+	conn, c = connectToDB(db_name)
 	try:
 		sql = 'INSERT or IGNORE INTO {} ({}) VALUES ({})'.format(table,
             ','.join(my_keys.keys()),
@@ -209,6 +213,15 @@ def parseContents(response, original_url):
 			clean_url = clean_url.rsplit("#", 1)[0].strip()
 			if checkUrl(clean_url):
 				process_urls.append(clean_url)
+			elif 'http' in clean_url and clean_url != data_url and checkIndex(clean_url) == False and checkCrawl(clean_url) == False:
+				conn, c = connectToDB(external_links_db, True)
+				query = "SELECT * FROM {} WHERE id = '{}'".format(table, clean_url)
+				res = c.execute(query)
+				dbitem = res.fetchone()
+				on_pages = dbitem['on_pages'] + ', ' + data_url if dbitem != None and data_url not in dbitem['on_pages'] else data_url
+				value = {'id': clean_url, 'url': clean_url, 'on_pages': on_pages}
+				writeToDB(value, external_db_fields, external_links_db)
+
 	content = content if type(content) == str else str(content)
 	content = re.sub(' +', ' ', content.replace('\n', ' ')).strip()
 	if 'id_field' in settings.keys() and settings['id_field']:
@@ -240,40 +253,93 @@ def parse_type(sql_keys, key, value):
 	else:
 		return str(value)
 
-def connectToDB():
+def connectToDB(db_name=db_name, rows=False):
 	conn = sqlite3.connect(db_name)
+	if rows:
+		conn.row_factory = sqlite3.Row
 	c = conn.cursor()
 	return conn, c
 
-def checkDB():
-	conn, c = connectToDB()
+def checkDB(db_name=db_name, my_keys=my_keys):
+	conn, c = connectToDB(db_name)
 	table_columns = ["{} {}".format(key, value) for key, value in my_keys.items()]
 	c.execute("CREATE TABLE IF NOT EXISTS {} ({})".format(table, ", ".join(table_columns)))
 	c.execute("select * from {} limit 1".format(table))
 	col_name=[i[0] for i in c.description]
 	missing_columns = list(filter(lambda x: x not in col_name, my_keys.keys()))
-
 	if len(missing_columns) > 0:
 		for col in missing_columns:
 			c.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, col, my_keys[col]))
 	conn.commit()
 	conn.close()
 
+def writeRow(dictionary, raw_content):
+	with open('deadlnks.csv', 'a', newline='') as f:
+		writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
+		parsed_html = BeautifulSoup(raw_content, "html.parser")
+		partialurl = dictionary['url'].split('edu/')[-1]
+		for links in parsed_html.findAll("a", href=lambda href: href and partialurl in href):
+			dictionary['anchor'] = links.get_text()
+			dictionary['link'] = links
+			writer.writerow(dictionary)
+		f.close()
+
+def requestsGet(externalitem):
+	try:
+		response = requests.get(externalitem['url'])
+		status_code = response.status_code
+	except:
+		status_code = 500
+	if status_code > 299:
+		conn, c = connectToDB(db_name, True)
+		on_pages = externalitem['on_pages'].split(', ')
+		for page in on_pages:
+			res = c.execute("SELECT * FROM {} WHERE original_url = '{}' OR id = '{}'".format(table, page, page))
+			pagecontent = res.fetchone()
+			if pagecontent:
+				writeRow({'url':externalitem['url'], 'code': status_code, 'on page': page}, pagecontent['raw_content'])
+			else:
+				print(externalitem['url'])
+
+def checkExternalLinks():
+	conn, c = connectToDB(external_links_db, True)
+	query = "SELECT * FROM {}".format(table)
+	res = c.execute(query)
+	externaldbitems = list(map(lambda x: dict(x), res.fetchall()))
+	with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
+			future_to_url = (executor.submit(requestsGet(externalitem), externalitem, TIMEOUT) for externalitem in externaldbitems[0:len(externaldbitems)])
+			for future in concurrent.futures.as_completed(future_to_url):
+				pass
+			gc.collect()
 def main():
 	if args.function:
 		if args.function == 'index':
 			if settings['solr_index']:
-				conn, c = connectToDB()
-				conn.row_factory = sqlite3.Row
-				c = conn.cursor()
+				conn, c = connectToDB(db_name, True)
 				res = c.execute("SELECT * FROM {}".format(table))
 				crawls = res.fetchall()
 				for item in crawls:
 					indexInSolr(dict(item))
 			else:
 				print('\n You are missing the variable "solr_index" which is set in the settings.yml file. Please update the file with the correct variable and try running again. \n')
+		elif args.function == 'deadlinks':
+			conn, c = connectToDB(db_name, True)
+			query = "SELECT * FROM {} WHERE status_code > 299".format(table)
+			res = c.execute(query)
+			dbitems = list(map(lambda x: dict(x), res.fetchall()))
+			with open('deadlnks.csv', 'w', newline='') as f:
+				writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
+				writer.writeheader()
+			for item in dbitems:
+				query = "SELECT * FROM {} WHERE urls_on_page LIKE '%{}%' OR urls_on_page LIKE '%{}%'".format(table, item['url'], item['original_url'])
+				res = c.execute(query)
+				for on_page in res.fetchall():
+					writeRow({'url': item['url'], 'code': item['status_code'], 'on page': on_page['url']}, item['raw_content'])
+			checkExternalLinks()
+			
 		elif args.function == 'crawl':
 			checkDB()
+			checkDB(external_links_db, external_db_fields)
 			for url in urls:
 				getContents(url)
 			while len(process_urls) > 0:
@@ -283,11 +349,10 @@ def main():
 						pass
 					gc.collect()
 			if args.refresh is True:
-				conn, c = connectToDB()
-				conn.row_factory = sqlite3.Row
-				c = conn.cursor()
+				connectToDB(db_name, True)
 				res = c.execute("SELECT id FROM {} WHERE crawled < '{}'".format(table, datetime.now(timezone.utc) - timedelta(days=1)))
 				deleteitems = tuple(map(lambda x: x['id'], res.fetchall()))
+				res2 = c.execute("SELECT * FROM {}".format(table))
 				c.execute("DELETE FROM {} WHERE id IN {}".format(table, deleteitems))
 				conn.commit()
 				if settings['solr_index']:
@@ -299,8 +364,9 @@ def main():
 if __name__ == '__main__':
 	parser=argparse.ArgumentParser(
 	description='''Webcrawling script for crawling a list of webpages.''')
-	parser.add_argument('--refresh', type=bool, default=False, help='True or False value; will delete db and crawl all pages from scratch.')
-	parser.add_argument('function', default=None, help='The name of what you want the the script to do. Options are: index and crawl')
+	parser.add_argument('--refresh', action='store_true', help='True or False value; will delete db and crawl all pages from scratch.')
+	parser.add_argument('--includexternal', action='store_true', help='True or False value; will delete db and crawl all pages from scratch.')
+	parser.add_argument('function', default=None, help='The name of what you want the the script to do. Options are: index, crawl and deadlinks')
 	args=parser.parse_args()
 	main()
 	
