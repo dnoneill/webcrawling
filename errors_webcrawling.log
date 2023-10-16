@@ -142,3 +142,73 @@ WARNING:root:*******problem url https://www.lib.ncsu.edu/think-and-view
 no such column: crawled*******
 WARNING:root:*******problem url https://www.lib.ncsu.edu/services
 no such column: crawled*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/databases
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/findingaids/resources
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/publications/NLarchives/
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/staff/results
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/giving
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/articles/
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/services/makerspace
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/archivedexhibits/past.html
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/do
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/software
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/faculty
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/scrc/departmental-history-mse
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/etds
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/news
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/news/archive/2018
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/news/archive/2019
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/renovation
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/toward-a-better-planet-symposium
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/personal-librarians
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/devices
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/hours
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/stories
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/spaces
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/journals/browse.php
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/workshops
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/events
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/course
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/exhibits
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/scrc
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/askus
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/faq
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/jobs
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/think-and-view
+name 'c' is not defined*******
+WARNING:root:*******problem url https://www.lib.ncsu.edu/services
+name 'c' is not defined*******
