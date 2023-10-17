@@ -31,13 +31,14 @@ jobs:
     - name: run script
       run: |
         python webcrawler.py crawl
+        python webcrawler.py deadlinks
     - name: commit files
       run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git config pull.rebase false
           git pull origin main
-          git add *.log
+          git add *.log *.csv
           git commit -m "data from script" -a || echo "No changes to commit"
     - name: push changes
       uses: ad-m/github-push-action@v0.6.0
