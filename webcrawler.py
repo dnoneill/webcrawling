@@ -104,7 +104,7 @@ def getHTTP(text):
 			process_urls.append(x)
 
 def all_tags(parsed_html, tag):
-	return " ".join(list(map(lambda x: x.get_text(), parsed_html.find_all(tag))))
+	return " ".join(list(map(lambda x: x.get_text(separator=u' '), parsed_html.find_all(tag))))
 
 
 def writeToDB(value, my_keys=my_keys, db_name=db_name):
@@ -172,17 +172,17 @@ def parseContents(response, original_url):
 	else:
 		parsed_html = BeautifulSoup(response.content, "html.parser" )
 		content = 'find me no text'
-		metadata['title'] = parsed_html.title.get_text() if parsed_html.title else metadata['title']
+		metadata['title'] = parsed_html.title.get_text(separator=u' ') if parsed_html.title else metadata['title']
 		if content_field and parsed_html.find(content_field['tag'], {"id": content_field['id']}):
-			content = parsed_html.find(content_field['tag'], {"id": content_field['id']}).get_text()
+			content = parsed_html.find(content_field['tag'], {"id": content_field['id']}).get_text(separator=u' ')
 		elif parsed_html.main:
-			content = parsed_html.main.get_text()
+			content = parsed_html.main.get_text(separator=u' ')
 		elif parsed_html.section:
 			content = all_tags(parsed_html, 'section')
 		elif parsed_html.article:
 			content = all_tags(parsed_html, 'content')
 		elif parsed_html.body:
-			content = parsed_html.body.get_text()
+			content = parsed_html.body.get_text(separator=u' ')
 		for key in fields.keys():
 			meta_key = fields[key]['solr'] if 'solr' in fields[key].keys() else key
 			get_content = parsed_html.find("meta",  {"property":"og:{}".format(key)})
@@ -279,7 +279,7 @@ def writeRow(dictionary, raw_content):
 		parsed_html = BeautifulSoup(raw_content, "html.parser")
 		partialurl = dictionary['url'].split('edu/')[-1]
 		for links in parsed_html.findAll("a", href=lambda href: href and partialurl in href):
-			dictionary['anchor'] = links.get_text()
+			dictionary['anchor'] = links.get_text(separator=u' ')
 			dictionary['link'] = links
 			writer.writerow(dictionary)
 		f.close()
@@ -298,8 +298,8 @@ def requestsGet(externalitem):
 			pagecontent = res.fetchone()
 			if pagecontent:
 				writeRow({'url':externalitem['url'], 'code': status_code, 'on page': page}, pagecontent['raw_content'])
-			else:
-				print(externalitem['url'])
+			# else:
+			# 	print(externalitem['url'])
 
 def checkExternalLinks():
 	conn, c = connectToDB(external_links_db, True)
