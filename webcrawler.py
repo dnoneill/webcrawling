@@ -396,16 +396,9 @@ def main():
 	else:
 		print('\n You are missing required positional argument crawl or index. i.e. python3 webcrawler.py crawl or python3 webcrawler.py index. \n')
 
-def getColumnNames(db):
-	conn, c = connectToDB(db, True)
-	cursor = c.execute('SELECT * from {}'.format(table))
-	colnames = cursor.description
-	names = [row[0] for row in colnames]
-	return names
-
 if __name__ == '__main__':
-	names = getColumnNames(db_name)
-	names2 = getColumnNames(external_links_db)
+	names = my_keys.keys()
+	names2 = external_db_fields.keys()
 	parser=argparse.ArgumentParser(
 	description='''Webcrawling script for crawling a list of webpages.''')
 	parser.add_argument('--refresh', action='store_true', help='True or False value; will delete db and crawl all pages from scratch.')
