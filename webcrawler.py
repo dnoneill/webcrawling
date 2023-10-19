@@ -366,7 +366,8 @@ def main():
 				out_file.close() 
 			elif extension == '.csv':
 				with open(args.dumplocation, 'w') as f:
-					writer = csv.DictWriter(f, fieldnames=allitems[0].keys())
+					fieldnames = list(allitems[0].keys()) + list(allitems[-1].keys())
+					writer = csv.DictWriter(f, fieldnames=fieldnames)
 					writer.writeheader()
 					for row in allitems:
 						writer.writerow(row)
