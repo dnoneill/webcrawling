@@ -44,7 +44,7 @@ content_field = settings['content_field'] if 'content_field' in settings.keys() 
 db_name = 'crawl_db'
 table = "crawls"
 external_links_db = "external_links_db"
-external_db_fields = {'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'on_pages': 'TEXT'}
+external_db_fields = {'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'on_pages': 'TEXT', 'status_code': 'INTEGER'}
 logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
 
 def clean_keys(key):
@@ -278,7 +278,8 @@ def writeRow(dictionary, raw_content):
 		writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
 		parsed_html = BeautifulSoup(raw_content, "html.parser")
 		partialurl = dictionary['url'].split('edu/')[-1]
-		for links in parsed_html.findAll("a", href=lambda href: href and partialurl in href):
+		writeToDB(dictionary, external_db_fields, external_links_db)
+		for links in parsed_html.findAll("a", href=lambda href: href and re.search('({})(\/?)$'.format(partialurl), href)):
 			dictionary['anchor'] = links.get_text(separator=u' ')
 			dictionary['link'] = links
 			writer.writerow(dictionary)
@@ -336,7 +337,41 @@ def main():
 				for on_page in res.fetchall():
 					writeRow({'url': item['url'], 'code': item['status_code'], 'on page': on_page['url']}, item['raw_content'])
 			checkExternalLinks()
-			
+		elif args.function == 'dump':
+			field = args.searchfield
+			value = args.searchvalue
+			conn, c = connectToDB(db_name, True)
+			query = "SELECT * FROM {} WHERE {} = '{}'".format(table, field, value)
+			if args.sqlquery:
+				query = args.sqlquery
+			res = c.execute(query)
+			internal = res.fetchall()
+			conn, c = connectToDB(external_links_db, True)
+			res2 = c.execute(query)
+			external = res2.fetchall()
+			allitems = internal + external
+			extension = ''
+			if args.dumplocation:
+				filename, extension = os.path.splitext(args.dumplocation) 
+			if len(allitems) == 0:
+				print('No results!\n')
+				return 0
+			allitems = list(map(lambda x: dict(x), allitems))
+			if extension == '.json':
+				out_file = open(args.dumplocation, "w") 
+				json.dump(allitems, out_file, indent = 6) 
+				out_file.close() 
+			elif extension == '.csv':
+				with open(args.dumplocation, 'w') as f:
+					writer = csv.DictWriter(f, fieldnames=allitems[0].keys())
+					writer.writeheader()
+					for row in allitems:
+						writer.writerow(row)
+			else:
+				for item in allitems:
+					for key, value in item.items():
+						print('{}: {}\n'.format(key, value))
+					print('************************')
 		elif args.function == 'crawl':
 			checkDB()
 			checkDB(external_links_db, external_db_fields)
@@ -361,12 +396,25 @@ def main():
 	else:
 		print('\n You are missing required positional argument crawl or index. i.e. python3 webcrawler.py crawl or python3 webcrawler.py index. \n')
 
+def getColumnNames(db):
+	conn, c = connectToDB(db, True)
+	cursor = c.execute('SELECT * from {}'.format(table))
+	colnames = cursor.description
+	names = [row[0] for row in colnames]
+	return names
+
 if __name__ == '__main__':
+	names = getColumnNames(db_name)
+	names2 = getColumnNames(external_links_db)
 	parser=argparse.ArgumentParser(
 	description='''Webcrawling script for crawling a list of webpages.''')
 	parser.add_argument('--refresh', action='store_true', help='True or False value; will delete db and crawl all pages from scratch.')
-	parser.add_argument('--includexternal', action='store_true', help='True or False value; will delete db and crawl all pages from scratch.')
-	parser.add_argument('function', default=None, help='The name of what you want the the script to do. Options are: index, crawl and deadlinks')
+	parser.add_argument('--includexternal', action='store_true', help='Default is True. Value is True or False. If set to false with not check to see if the external urls on your webpages are dead.')
+	parser.add_argument('--searchfield', help='field where you want to search, fields in internal links database are: {}\n fields in external links db are: {}  '.format(", ".join(names), ", ".join(names2)))
+	parser.add_argument('--searchvalue', help='the value match for the field, if you want to do more complicated sql queries outside field=fieldvalue use sqlquery value')
+	parser.add_argument('--sqlquery', help='sql query for searching both databases, the table name is "{}" '.format(table))
+	parser.add_argument('--dumplocation', help='filepath with extension for where you want the results to be dumped. Valid extensions are json and csv. This is an optional field, if not set then the results with print in the console.')
+	parser.add_argument('function', default=None, help='The name of what you want the the script to do. Options are: index, crawl, dump and deadlinks')
 	args=parser.parse_args()
 	main()
 	
