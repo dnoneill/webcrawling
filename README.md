@@ -41,3 +41,12 @@ days_between: 1 <-- Number of days between crawls. If the page has been crawled 
 
 ```python3 webcrawler.py index```
 
+* This function dumps all the dead links on the pages crawled into a csv file. If you don't want to check the urls for external links on your webpages, include the flag --excludexternal
+```python3 webcrawler.py deadlinks --excludexternal```
+
+* This allows you to dump the data in from your db files into a readable format. There are multiple flags for this function.
+* You are requried to either use --searchfield && --searchvalue where you set the searchfield and searchvalue you are looking for. For example if you are looking for url that equals 'https://example.com' you would run `python3 webcrawler.py dump --searchfield url --searchvalue 'https://example.com'`. python3 webcrawler.py --help includes the fields in each db.
+* OR Your other option is to use a sql query. By default the name of the table in each db is named 'crawl' but it can also be found python3 webcrawler.py --help. An example query is `python3 webcrawler.py dump --sqlquery 'SELECT * FROM crawl WHERE status_code > 299'
+* By default the dump will print each item into the console. You can also dump into a json or csv file by setting the --dumplocation field to a filepath with the extension for the dump. For example, `python3 webcrawler.py dump --searchfield url --searchvalue 'https://example.com' --dumppath 'outputpath/filename.json'` will dump a json file. If you change .json to .csv you will get a csv file.
+```python3 webcrawler.py dump```
+
