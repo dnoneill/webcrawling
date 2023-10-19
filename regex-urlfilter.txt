@@ -39,7 +39,7 @@
 -^https://dnoneill.github.io/webcrawling/test
 
 # Allows crawling but not indexing of skipped pages, this can be any regex matching, not just specific urls
-crawl((https://dnoneill.github.io/webcrawling))
+crawl((https://dnoneill.github.io/webcra*))
 
 # skip the mobile site
 -(/m/.+/)
