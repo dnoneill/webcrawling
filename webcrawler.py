@@ -349,11 +349,11 @@ def main():
 						pass
 					gc.collect()
 			if args.refresh is True:
-				connectToDB(db_name, True)
+				conn, c = connectToDB(db_name, True)
 				res = c.execute("SELECT id FROM {} WHERE crawled < '{}'".format(table, datetime.now(timezone.utc) - timedelta(days=1)))
-				deleteitems = tuple(map(lambda x: x['id'], res.fetchall()))
+				deleteitems = list(map(lambda x: x['id'], res.fetchall()))
 				res2 = c.execute("SELECT * FROM {}".format(table))
-				c.execute("DELETE FROM {} WHERE id IN {}".format(table, deleteitems))
+				c.execute("DELETE FROM {} WHERE id IN ({})".format(table, ', '.join('?' for item in deleteitems)), tuple(deleteitems))
 				conn.commit()
 				if settings['solr_index']:
 					deleteFromSolr(list(deleteitems))
@@ -370,4 +370,3 @@ if __name__ == '__main__':
 	args=parser.parse_args()
 	main()
 	
-
