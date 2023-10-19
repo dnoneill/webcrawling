@@ -1,10 +1,10 @@
 ---
 ---
-[test](/test)
+[test](/webcrawling/test)
 
 index page contents
 
-[test2](/test2)
+[test2](/webcrawling/test2)
 
 [external link](https://lib.ncsu.edu)
 
