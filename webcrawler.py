@@ -338,7 +338,8 @@ def main():
 				res = c.execute(query)
 				for on_page in res.fetchall():
 					writeRow({'url': item['url'], 'code': item['status_code'], 'on page': on_page['url']}, item['raw_content'])
-			checkExternalLinks()
+			if not args.excludexternal:
+				checkExternalLinks()
 		elif args.function == 'dump':
 			field = args.searchfield
 			value = args.searchvalue
@@ -404,7 +405,7 @@ if __name__ == '__main__':
 	parser=argparse.ArgumentParser(
 	description='''Webcrawling script for crawling a list of webpages.''')
 	parser.add_argument('--refresh', action='store_true', help='True or False value; will delete db and crawl all pages from scratch.')
-	parser.add_argument('--includexternal', action='store_true', help='Default is True. Value is True or False. If set to false with not check to see if the external urls on your webpages are dead.')
+	parser.add_argument('--excludexternal', action='store_true', help='Default is False. Value is True or False. If set to true with not check to see if the external urls on your webpages are dead.')
 	parser.add_argument('--searchfield', help='field where you want to search, fields in internal links database are: {}\n fields in external links db are: {}  '.format(", ".join(names), ", ".join(names2)))
 	parser.add_argument('--searchvalue', help='the value match for the field, if you want to do more complicated sql queries outside field=fieldvalue use sqlquery value')
 	parser.add_argument('--sqlquery', help='sql query for searching both databases, the table name is "{}" '.format(table))
