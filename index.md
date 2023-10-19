@@ -10,6 +10,6 @@ index page contents
 
 [another external link](https://example.com)
 
-[dead external link]([https://example.com/123](https://www.lib.ncsu.edu/events/coffee-viz-reshaping-urban-futures-embracing-change-and-resilience-face-climate-challenges2)https://www.lib.ncsu.edu/events/coffee-viz-reshaping-urban-futures-embracing-change-and-resilience-face-climate-challenges2)
+[dead external link](https://www.lib.ncsu.edu/events/coffee-viz-reshaping-urban-futures-embracing-change-and-resilience-face-climate-challenges2)
 
 [dead internal link](/test23)
