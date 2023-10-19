@@ -110,7 +110,7 @@ def all_tags(parsed_html, tag):
 def writeToDB(value, my_keys=my_keys, db_name=db_name):
 	conn, c = connectToDB(db_name)
 	try:
-		sql = 'INSERT or IGNORE INTO {} ({}) VALUES ({})'.format(table,
+		sql = 'INSERT or REPLACE INTO {} ({}) VALUES ({})'.format(table,
             ','.join(my_keys.keys()),
             ','.join(['?']*len(my_keys)))
 		c.execute(sql, tuple([parse_type(my_keys, k, v) for k, v in value.items() if k in my_keys]))
@@ -219,7 +219,7 @@ def parseContents(response, original_url):
 				res = c.execute(query)
 				dbitem = res.fetchone()
 				on_pages = dbitem['on_pages'] + ', ' + data_url if dbitem != None and data_url not in dbitem['on_pages'] else data_url
-				value = {'id': clean_url, 'url': clean_url, 'on_pages': on_pages}
+				value = {'id': clean_url, 'url': clean_url, 'on_pages': on_pages, 'status_code': 0}
 				writeToDB(value, external_db_fields, external_links_db)
 
 	content = content if type(content) == str else str(content)
@@ -278,7 +278,6 @@ def writeRow(dictionary, raw_content):
 		writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
 		parsed_html = BeautifulSoup(raw_content, "html.parser")
 		partialurl = dictionary['url'].split('edu/')[-1]
-		writeToDB(dictionary, external_db_fields, external_links_db)
 		for links in parsed_html.findAll("a", href=lambda href: href and re.search('({})(\/?)$'.format(partialurl), href)):
 			dictionary['anchor'] = links.get_text(separator=u' ')
 			dictionary['link'] = links
@@ -301,6 +300,9 @@ def requestsGet(externalitem):
 				writeRow({'url':externalitem['url'], 'code': status_code, 'on page': page}, pagecontent['raw_content'])
 			# else:
 			# 	print(externalitem['url'])
+	externalitem['status_code'] = status_code
+	writeToDB(externalitem, external_db_fields, external_links_db)
+
 
 def checkExternalLinks():
 	conn, c = connectToDB(external_links_db, True)
