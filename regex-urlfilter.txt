@@ -27,100 +27,21 @@
 
 # skip image and other suffixes we can't yet parse
 # for a more extensive coverage use the urlfilter-suffix plugin
--\.(gif|GIF|jpg|JPG|png|PNG|ico|ICO|css|CSS|sit|SIT|eps|EPS|wmf|WMF|zip|ZIP|ppt|PPT|mpg|MPG|xls|XLS|gz|GZ|rpm|RPM|tgz|TGZ|mov|MOV|exe|EXE|jpeg|JPEG|bmp|BMP|js|JS)$
-
-# allow crawling of news archive pages
-+^https://www.lib.ncsu.edu/news/archive/(20[0-9]*)\?.*$
+-\.(gif|GIF|jpg|JPG|png|PNG|ico|ICO|css|CSS|sit|SIT|eps|EPS|wmf|WMF|zip|ZIP|ppt|PPT|mpg|MPG|xls|XLS|gz|GZ|rpm|RPM|tgz|TGZ|mov|MOV|exe|EXE|jpeg|JPEG|bmp|BMP|js|JS|xml|XML)$
 
 # skip URLs containing certain characters as probable queries, etc.
 -[?*!@=]
 
-# skip URLs with slash-delimited segment that repeats 3+ times, to break loops
--.*(/[^/]+)/[^/]+\1/[^/]+\1/
-
-# skip certain directories on the NCSU Libraries website that should not be searchable
--(/dml/roomreservations|/gis/search/|/faq/|/calendar/|/spotlightArchives/|/cgi-bin/|/proxy/)
--(/reserves/|/podcasts/m3u/|/jobs/epa/internal/)
--(/etd/|/theses/|/ETD-db/|/search/|/journals/|/catalogws/|/facetbrowser/|/display/)
--(/ld/|/node/)
-
-# skip URLs to alphabetical lists which typically consist of redundant links
--(/[a-zA-Z]\.html|#[a-zA-Z]$|\?alpha=[a-zA-Z]$)
-
-# skip redundant finding aids browse pages for now
-#-(/findingaids/allbytitle\.html)
-#-(/findingaids/(all|mc|rb|ua)bynumber\.html)
-#-(/findingaids/(all|mc|rb|ua)bydate\.html)
-#-(/findingaids/(all|mc|rb|ua)bytype\.html)
-# new style finding aids links
--(/findingaids/search.*)
--(/findingaids/.*doc\.view)
--(/findingaids/.*\.xml)
--(ohioamish)
-
-# skip hours queries
--(/hours/\?.*)
-
-# skip tempjobs database browse pages
--(/jobs/tempjobs2/)
-
-# skip urls containing wordpress
--(wordpress|wp-content|xmlrpc|wp-includes)
-
-# skip agnic sitemap
--(/agnic/sys_entomology/sitemap\.html)
-
-# skip any /templates directories that may have been migrated to the public website
--(/templates/)
--(/website/)
-
-# don't index Scholarly Pubs search and browse pages, except for A-Z author list pages
--(/repository/search\.php\?.+)
--(/repository/scholpubs/search\.php\?(?!searchtype=browse|page=browse&ln=[a-zA-Z]$))
--(/repository/scholpubs/upload/upload\.php\?.+)
--(/repository/scholpubs/customsearch\.php\?.+)
-
-# skip learning commons forums and redirects
--(/learningcommons/redirect/)
-
-# skip special collections forestry tei docs
--(/specialcollections/forestry/.+/)
-
 # skip robots.txt files
 -(/robots.txt/)
 
-# skip XML files that are still being crawled for some reason
--(/.xml/)
+# skip certain pages
+-^https://dnoneill.github.io/webcrawling/test
 
-# accept josh wilson's PAMS wiki pages
-+^https://wikis.lib.ncsu.edu/index.php/.*PAMS_.*$
-
-# accept wordpress
-+^https://news.lib.ncsu.edu
-#+^https://news2.lib.ncsu.edu
-
-# skip wordpress categories/tags/page listings
--^https:\/\/news\.lib\.ncsu\.edu\/.*\/category\/.*
--^https:\/\/news\.lib\.ncsu\.edu\/.*\/tag\/.*
--^https:\/\/news\.lib\.ncsu\.edu\/page\/.*
-
-# skip certain index pages
--^https://www.lib.ncsu.edu/do$
-#-^https://www.lib.ncsu.edu/staff/results$
--^https://www.lib.ncsu.edu/stories/all$
-
--^https://www.lib.ncsu.edu/taxonomy/.*
--^https://www.lib.ncsu.edu/tag/.*
--^https://www.lib.ncsu.edu/news/tag/.*
--^https://www.lib.ncsu.edu/news/author/.*
--^https://www.lib.ncsu.edu/gis/imagemap/.*
-
-
-# skip homepage
--^https://www.lib.ncsu.edu/$
+# Allows crawling but not indexing of skipped pages, this can be any regex matching, not just specific urls
+crawl((https://dnoneill.github.io/webcrawling))
 
 # skip the mobile site
--^https://m.lib.ncsu.edu
 -(/m/.+/)
 
 # skip .edu./ urls
@@ -130,7 +51,8 @@
 -(/rss.xml)
 -(/feed/)
 
-# otherwise only accept hosts in www.lib.ncsu.edu domain
-+^https://www.lib.ncsu.edu
+# Update this to your domain
++^https://dnoneill.github.io/webcrawling
+
 
 
