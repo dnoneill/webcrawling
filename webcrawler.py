@@ -277,7 +277,7 @@ def writeRow(dictionary, raw_content):
 	with open('deadlnks.csv', 'a', newline='') as f:
 		writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
 		parsed_html = BeautifulSoup(raw_content, "html.parser")
-		partialurl = dictionary['url'].split('edu/')[-1]
+		partialurl = dictionary['url'].replace('https://', '').split('/', 1)[-1]
 		for links in parsed_html.findAll("a", href=lambda href: href and re.search('({})(\/?)$'.format(partialurl), href)):
 			dictionary['anchor'] = links.get_text(separator=u' ')
 			dictionary['link'] = links
