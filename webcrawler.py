@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta,timezone
 import gc, csv
 from time import sleep
-import argparse
+import argparse, sys
 
 gc.set_threshold(0)
 
@@ -44,7 +44,7 @@ content_field = settings['content_field'] if 'content_field' in settings.keys() 
 db_name = 'crawl_db'
 table = "crawls"
 external_links_db = "external_links_db"
-external_db_fields = {'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'on_pages': 'TEXT', 'status_code': 'INTEGER'}
+external_db_fields = {'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'on_pages': 'TEXT', 'status_code': 'INTEGER', 'updated': 'DATE'}
 logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
 
 def clean_keys(key):
@@ -219,7 +219,7 @@ def parseContents(response, original_url):
 				res = c.execute(query)
 				dbitem = res.fetchone()
 				on_pages = dbitem['on_pages'] + ', ' + data_url if dbitem != None and data_url not in dbitem['on_pages'] else data_url
-				value = {'id': clean_url, 'url': clean_url, 'on_pages': on_pages, 'status_code': 0}
+				value = {'id': clean_url, 'url': clean_url, 'on_pages': on_pages, 'status_code': 0, 'updated': None}
 				writeToDB(value, external_db_fields, external_links_db)
 
 	content = content if type(content) == str else str(content)
@@ -277,19 +277,22 @@ def writeRow(dictionary, raw_content):
 	with open('deadlnks.csv', 'a', newline='') as f:
 		writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
 		parsed_html = BeautifulSoup(raw_content, "html.parser")
-		partialurl = dictionary['url'].replace('https://', '').split('/', 1)[-1]
-		for links in parsed_html.findAll("a", href=lambda href: href and re.search('({})(\/?)$'.format(partialurl), href)):
-			dictionary['anchor'] = links.get_text(separator=u' ')
-			dictionary['link'] = links
-			writer.writerow(dictionary)
+		partialurl = dictionary['url'].replace('https://', '', 1).split('/', 1)[-1].strip('/')
+		for links in parsed_html.findAll("a", href=lambda href: href and re.search('({})(\/?)$'.format(re.escape(partialurl)), href)):
+			externalpartialurl = links['href'].split('//')[-1].split('/', 1)[-1].strip('/') if 'http' not in links['href'] else links['href']
+			compareurl = partialurl if 'http' not in links['href'] else dictionary['url']
+			if compareurl.strip('/') == externalpartialurl.strip('/'):
+				dictionary['anchor'] = links.get_text(separator=u' ')
+				dictionary['link'] = links
+				writer.writerow(dictionary)
 		f.close()
 
-def requestsGet(externalitem):
+def requestsGet(externalitem, percentage):
 	try:
-		response = requests.get(externalitem['url'])
+		response = requests.get(externalitem['url'], timeout=40)
 		status_code = response.status_code
 	except:
-		status_code = 500
+		status_code = 504
 	if status_code > 299:
 		conn, c = connectToDB(db_name, True)
 		on_pages = externalitem['on_pages'].split(', ')
@@ -301,19 +304,36 @@ def requestsGet(externalitem):
 			# else:
 			# 	print(externalitem['url'])
 	externalitem['status_code'] = status_code
+	externalitem['updated'] = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 	writeToDB(externalitem, external_db_fields, external_links_db)
+	
+	if args.sysout:
+		sys.stdout.write("\r")
+		barLen = 40
+		sys.stdout.write("[{:<{}}] {:.0f}%".format("=" * int(barLen * percentage), barLen, percentage * 100))
+		sys.stdout.flush()
 
+def getExternalItems():
+	conn, c = connectToDB(external_links_db, True)
+	query = "SELECT * FROM {} WHERE (updated = 'None' OR updated < '{}') \nLIMIT 100".format(table, datetime.now(timezone.utc) - timedelta(days=1))
+	res = c.execute(query)
+	externaldbitems = list(map(lambda x: dict(x), res.fetchall()))
+	return externaldbitems
 
 def checkExternalLinks():
 	conn, c = connectToDB(external_links_db, True)
-	query = "SELECT * FROM {}".format(table)
-	res = c.execute(query)
-	externaldbitems = list(map(lambda x: dict(x), res.fetchall()))
-	with concurrent.futures.ThreadPoolExecutor(max_workers=CONNECTIONS) as executor:
-			future_to_url = (executor.submit(requestsGet(externalitem), externalitem, TIMEOUT) for externalitem in externaldbitems[0:len(externaldbitems)])
+	numboffields = len(c.execute("SELECT * FROM {}".format(table)).fetchall())
+	itemscrawled = 0
+	externaldbitems = getExternalItems()
+	while itemscrawled < numboffields:
+		with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+			future_to_url = (executor.submit(requestsGet(externalitem, ((itemscrawled+idx)/numboffields)), externalitem, TIMEOUT) for idx, externalitem in enumerate(externaldbitems))
 			for future in concurrent.futures.as_completed(future_to_url):
 				pass
+				itemscrawled += 1
 			gc.collect()
+		externaldbitems = getExternalItems()
+		
 def main():
 	if args.function:
 		if args.function == 'index':
@@ -331,14 +351,22 @@ def main():
 			res = c.execute(query)
 			dbitems = list(map(lambda x: dict(x), res.fetchall()))
 			with open('deadlnks.csv', 'w', newline='') as f:
-				writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
-				writer.writeheader()
+			 	writer = csv.DictWriter(f, fieldnames=deadlinkfieldnames)
+			 	writer.writeheader()
 			for item in dbitems:
-				query = "SELECT * FROM {} WHERE urls_on_page LIKE '%{}%' OR urls_on_page LIKE '%{}%'".format(table, item['url'], item['original_url'])
+				partialurl = item['url'].replace('https://', '', 1).split('/', 1)[-1]
+				partialoriginalurl = item['original_url'].replace('https://', '', 1).split('/', 1)[-1]
+				query = """SELECT * FROM {} WHERE urls_on_page LIKE '%{}"%' OR urls_on_page LIKE '%{}"%'""".format(table, partialurl, partialoriginalurl)
 				res = c.execute(query)
-				for on_page in res.fetchall():
-					writeRow({'url': item['url'], 'code': item['status_code'], 'on page': on_page['url']}, item['raw_content'])
+				on_page_items = res.fetchall()
+				for on_page in on_page_items:
+					writeRow({'url': item['url'], 'code': item['status_code'], 'on page': on_page['url']}, on_page['raw_content'])
+					gc.collect()
 			if not args.excludexternal:
+				on_page_items = ''
+				conn, c = connectToDB(external_links_db, True)
+				res = c.execute("UPDATE {} SET updated='None'".format(table))
+				conn.close()
 				checkExternalLinks()
 		elif args.function == 'dump':
 			field = args.searchfield
@@ -377,6 +405,7 @@ def main():
 						print('{}: {}\n'.format(key, value))
 					print('************************')
 		elif args.function == 'crawl':
+			os.remove(external_links_db)
 			checkDB()
 			checkDB(external_links_db, external_db_fields)
 			for url in urls:
@@ -412,6 +441,7 @@ if __name__ == '__main__':
 	parser.add_argument('--sqlquery', help='sql query for searching both databases, the table name is "{}" '.format(table))
 	parser.add_argument('--dumplocation', help='filepath with extension for where you want the results to be dumped. Valid extensions are json and csv. This is an optional field, if not set then the results with print in the console.')
 	parser.add_argument('function', default=None, help='The name of what you want the the script to do. Options are: index, crawl, dump and deadlinks')
+	parser.add_argument('sysout', action='store_true', help='True or False value; will display percentage finished for deadlinks')
 	args=parser.parse_args()
 	main()
 	
