@@ -1,0 +1,6 @@
+requests
+PyPDF2
+bs4
+pysolr
+pyyaml
+python-dateutil
