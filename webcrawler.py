@@ -17,10 +17,18 @@ gc.set_threshold(0)
 
 CONNECTIONS = 1000
 TIMEOUT = 5
-settings = yaml.load(open("settings.yml"), Loader=yaml.FullLoader)
+scriptdir = os.path.dirname(os.path.realpath(__file__))
+settingspath = os.path.join(scriptdir, "settings.yml")
+settings = yaml.load(open(settingspath), Loader=yaml.FullLoader)
 regex_file = settings['regex_file']
-urls = open(settings['seed_file']).read().strip().split("\n")
-filterfile = open(regex_file).read().strip().split("\n")
+try:
+	urls = open(settings['seed_file']).read().strip().split("\n")
+	filterfile = open(regex_file).read().strip().split("\n")
+except:
+	seedfilepath = os.path.join(scriptdir, settings['seed_file'])
+	regex_file = os.path.join(scriptdir, settings['regex_file'])
+	urls = open(seedfilepath).read().strip().split("\n")
+	filterfile = open(regex_file).read().strip().split("\n")
 filters = list(filter(lambda x: x and x.startswith('#') == False and x.startswith('crawl') == False, filterfile))
 negativefilters = list(filter(lambda x: x.startswith('-'), filters))
 negativefilters = "|".join(list(map(lambda x: x.strip('-'),negativefilters)))
@@ -41,9 +49,9 @@ solrkeys = {v['solr']: v['type'] for k, v in fields.items() if 'solr' in v.keys(
 solrkeys['id'] = 'text'
 solrkeys['url'] = 'text'
 content_field = settings['content_field'] if 'content_field' in settings.keys() else None
-db_name = 'crawl_db'
+db_name = os.path.join(scriptdir, 'crawl_db')
 table = "crawls"
-external_links_db = "external_links_db"
+external_links_db = os.path.join(scriptdir, 'external_links_db')
 external_db_fields = {'id' : 'TEXT PRIMARY KEY', 'url': 'TEXT', 'on_pages': 'TEXT', 'status_code': 'INTEGER', 'updated': 'DATE'}
 logging.basicConfig(filename="errors_webcrawling.log", level=logging.WARNING)
 
